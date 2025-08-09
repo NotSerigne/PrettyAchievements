@@ -1,6 +1,6 @@
 {
   "steam_api": {
-    "api_key": "API_KEY_HERE",
+    "api_key": "YOUR_STEAM_API_KEY",
     "default_language": "fr",
     "max_retries": 3,
     "timeout": 10
@@ -12,9 +12,9 @@
     "min_percentage_display": 0.1
   },
   "debug": {
-    "verbose_mode": true,
-    "show_api_calls": true,
-    "log_errors": true
+    "verbose_mode": false,
+    "show_api_calls": false,
+    "log_errors": false
   },
   "paths": {
     "cache_dir": "./cache",
