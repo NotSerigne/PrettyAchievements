@@ -120,7 +120,7 @@ class GameDetector:
             self.get_game_name(game_id)
 
 
-"""test = GameDetector()
+test = GameDetector()
 test.scan_all_locations()
 
 print("Liste des ids trouvés :")
@@ -129,4 +129,4 @@ print(test.games_id)
 test.get_all_games_names()
 print("\n",test.games)
 
-print("\n",test.known_locations)"""
+print("\n",test.games_sources)

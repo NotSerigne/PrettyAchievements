@@ -313,7 +313,7 @@ if __name__ == "__main__":
     print("Fichiers achievements trouvés:", test_ach.achievement_files)
 
     print("\n=== TEST AUTO-ADAPTATIF AVEC CONFIG ===")
-    achievements = test_ach.get_best_achievements_auto('204360')
+    achievements = test_ach.get_best_achievements_auto('250900')
 
     for k, v in achievements.items():
         quality_icon = "🔑" if v['source'] == 'PREMIUM' else "🆓"
