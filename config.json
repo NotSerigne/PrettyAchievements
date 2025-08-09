@@ -1,0 +1,23 @@
+{
+  "steam_api": {
+    "api_key": "API_KEY_HERE",
+    "default_language": "fr",
+    "max_retries": 3,
+    "timeout": 10
+  },
+  "achievements": {
+    "fallback_beautify": true,
+    "show_hidden": true,
+    "sort_by_percentage": true,
+    "min_percentage_display": 0.1
+  },
+  "debug": {
+    "verbose_mode": true,
+    "show_api_calls": true,
+    "log_errors": true
+  },
+  "paths": {
+    "cache_dir": "./cache",
+    "output_dir": "./output"
+  }
+}
