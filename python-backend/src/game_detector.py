@@ -2,7 +2,7 @@ import os
 import requests
 
 
-class AchievementScanner:
+class GameDetector:
     def __init__(self):
         """Initialise le scanner avec tous les emplacements connus"""
 
@@ -39,20 +39,20 @@ class AchievementScanner:
 
     def scan_all_locations(self):
         """Scanne tous les emplacements connus pour trouver des jeux"""
-        print("🔍 Scan de tous les emplacements...")
+        #print("🔍 Scan de tous les emplacements...")
 
         for location_name, config in self.known_locations.items():
-            print(f"\n📁 Scanning {location_name}")
+            #print(f"\n📁 Scanning {location_name}")
             base_path = config["base_path"]
 
             if not os.path.exists(base_path):
-                print(f"    Base path doesn't exist: {base_path}")
+                #print(f"    Base path doesn't exist: {base_path}")
                 continue
 
             for team in config["teams"]:
 
                 team_path = os.path.join(base_path, team)
-                print("Scan de : ", team)
+                #print("Scan de : ", team)
                 self._scan_team_folder(team_path, team, location_name)
 
     def _scan_team_folder(self, team_path, team_name, location_name):
@@ -64,7 +64,7 @@ class AchievementScanner:
         :return:
         """
         if os.path.exists(team_path):
-            print(f"  ✅ Found: {team_path}")
+            #print(f"  ✅ Found: {team_path}")
             for item in os.listdir(team_path):
                 # Filtrer les dossiers qui ne sont pas des IDs de jeu
                 if self._is_valid_game_id(item):
@@ -72,13 +72,15 @@ class AchievementScanner:
                         self.games_id.append(item)
                         # Stocker la source
                         self.games_sources[item] = {
+                            'name': self.get_game_name(item),
+                            'path': os.path.join(team_path, item),
                             'team': team_name,
-                            'location': location_name,
-                            'path': os.path.join(team_path, item)
+                            'location': location_name
                         }
-                        print(f"    🎮 Game found -> {item} : {self.get_game_name(item)} ({team_name})")
+                        #print(f"    🎮 Game found -> {item} : {self.get_game_name(item)} ({team_name})")
         else:
-            print(f"    ❌ Team folder doesn't exist: {team_path}")
+            #print(f"    ❌ Team folder doesn't exist: {team_path}")
+            return
 
     def _is_valid_game_id(self, folder_name):
         """Vérifie si un nom de dossier est un ID de jeu valide"""
@@ -118,10 +120,13 @@ class AchievementScanner:
             self.get_game_name(game_id)
 
 
-test = AchievementScanner()
+"""test = GameDetector()
 test.scan_all_locations()
+
 print("Liste des ids trouvés :")
 print(test.games_id)
 
 test.get_all_games_names()
-print(test.games)
+print("\n",test.games)
+
+print("\n",test.known_locations)"""
