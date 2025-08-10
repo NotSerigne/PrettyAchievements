@@ -51,7 +51,10 @@ function runGameDetector() {
             ].join('; ');
 
             const py = process.platform === 'win32' ? 'python' : 'python3';
-            const child = spawn(py, ['-c', code], { windowsHide: true });
+            const child = spawn(py, ['-c', code], {
+                windowsHide: true,
+                env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+            });
 
             let stdout = '';
             let stderr = '';
@@ -65,13 +68,40 @@ function runGameDetector() {
                 if (code !== 0) {
                     return reject(new Error(`Python exited with code ${code}: ${stderr}`));
                 }
-                try {
-                    const parsed = JSON.parse(stdout || '{}');
-                    resolve(parsed);
-                } catch (e) {
-                    console.error('Failed to parse Python output:', stdout);
-                    resolve({});
+
+                const raw = (stdout || '').trim();
+                // Try direct parse first
+                const tryParses = [];
+                tryParses.push(() => JSON.parse(raw));
+                // Extract last JSON object between braces
+                tryParses.push(() => {
+                    const start = raw.lastIndexOf('{');
+                    const end = raw.lastIndexOf('}');
+                    if (start !== -1 && end !== -1 && end > start) {
+                        const candidate = raw.slice(start, end + 1);
+                        return JSON.parse(candidate);
+                    }
+                    throw new Error('No JSON braces found');
+                });
+                // Parse last line that looks like a JSON object
+                tryParses.push(() => {
+                    const line = raw.split(/\r?\n/).reverse().find(l => {
+                        const t = l.trim();
+                        return t.startsWith('{') && t.endsWith('}');
+                    });
+                    if (line) return JSON.parse(line.trim());
+                    throw new Error('No JSON line found');
+                });
+
+                for (const fn of tryParses) {
+                    try {
+                        const parsed = fn();
+                        return resolve(parsed && typeof parsed === 'object' ? parsed : {});
+                    } catch (_) { /* try next strategy */ }
                 }
+
+                console.error('Failed to parse Python output:', stdout);
+                resolve({});
             });
         } catch (e) {
             reject(e);

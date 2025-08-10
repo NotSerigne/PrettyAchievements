@@ -25,11 +25,11 @@ class GameDetector:
         #print(f"🔍 Scan de {len(self.known_locations)} emplacements...")
 
         for location_name, config in self.known_locations.items():
-            #print(f"\n📁 Scanning {location_name}")
+            #print(f"\n Scanning {location_name}")
             base_path = os.path.expanduser(config["base_path"])  # Gère les ~ automatiquement
 
             if not os.path.exists(base_path):
-                #print(f"    ❌ Base path doesn't exist: {base_path}")
+                #print(f"     Base path doesn't exist: {base_path}")
                 continue
 
             for team in config["teams"]:
@@ -40,7 +40,7 @@ class GameDetector:
     def _scan_team_folder(self, team_path, team_name, location_name):
         """Scanne un dossier d'équipe pour trouver des jeux"""
         if os.path.exists(team_path):
-            #print(f"      ✅ Found: {team_path}")
+            #print(f"       Found: {team_path}")
             for item in os.listdir(team_path):
                 if self._is_valid_game_id(item):
                     if item not in self.games_id:
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     print(test.games_id)
 
     test.get_all_games_names()
-    print("\n📚 Games :", test.games)
-    print("\n📁 Sources :", test.games_sources)
+    print("\n Games :", test.games)
+    print("\n Sources :", test.games_sources)
 
 

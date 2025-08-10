@@ -18,13 +18,13 @@ class ConfigManager:
             if os.path.exists(config_file):
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                print(f"✅ Configuration chargée depuis {config_file}")
+                print(f" Configuration chargée depuis {config_file}")
                 return config
             else:
-                print(f"⚠️ Fichier {config_file} non trouvé, configuration par défaut utilisée")
+                print(f" Fichier {config_file} non trouvé, configuration par défaut utilisée")
                 return self.get_default_config()
         except Exception as e:
-            print(f"❌ Erreur chargement config: {e}")
+            print(f" Erreur chargement config: {e}")
             return self.get_default_config()
 
     def get_default_config(self):
@@ -89,7 +89,7 @@ class ConfigManager:
         }
         # 🔄 Met à jour aussi la config principale
         self.config["known_locations"] = self.known_locations
-        print(f"📁 Nouvel emplacement ajouté: {name}")
+        print(f" Nouvel emplacement ajouté: {name}")
 
     # 🆕 MÉTHODES BONUS UTILES :
 
@@ -112,4 +112,4 @@ class ConfigManager:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
             print(f"💾 Configuration sauvegardée dans {self.config_file}")
         except Exception as e:
-            print(f"❌ Erreur sauvegarde config: {e}")
+            print(f" Erreur sauvegarde config: {e}")
