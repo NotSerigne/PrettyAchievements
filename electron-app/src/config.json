@@ -1,0 +1,20 @@
+{
+  "general": {
+    "autoStart": false,
+    "notifications": true,
+    "minimizeToTray": false,
+    "refreshEveryMinutes": 15
+  },
+  "images": {
+    "enableSteamImages": true,
+    "steamImageQuality": "high",
+    "imageCacheDuration": 7
+  },
+  "detection": {
+    "folders": []
+  },
+  "cache": {
+    "autoRefreshCache": true,
+    "cacheDuration": 24
+  }
+}
