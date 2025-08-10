@@ -1167,6 +1167,7 @@ body {
 }
 
 .sidebar-games-grid .game-card-header {
+    border-radius: 0;
     height: 75px;
     margin: 2px 2px 0 2px;
 }
@@ -1228,3 +1229,66 @@ body {
     text-align: right;
 }
 
+/* ===== RESCAN ICON (top-right) ===== */
+.rescan-menu {
+    position: fixed;
+    top: 20px; /* same as burger-menu */
+    right: 20px;
+    z-index: 1002;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(103, 156, 223, 0.3);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+}
+.rescan-menu:hover {
+    background: var(--primary-dark);
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(103, 156, 223, 0.4);
+}
+.rescan-menu:active {
+    transform: scale(0.95);
+}
+
+/* Better centering for empty state inside games grid */
+#gamesGrid .no-results {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    min-height: 220px;
+}
+
+/* ===== GLOBAL: Hide all scrollbars while keeping scroll functionality ===== */
+/* Chrome, Safari, Opera (WebKit/Blink) */
+*::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+}
+*::-webkit-scrollbar-thumb {
+    background: transparent !important;
+}
+*::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+/* Firefox */
+* {
+    scrollbar-width: none !important;
+}
+/* IE and old Edge */
+* {
+    -ms-overflow-style: none !important;
+}

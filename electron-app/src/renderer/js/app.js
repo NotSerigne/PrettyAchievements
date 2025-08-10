@@ -4,20 +4,31 @@ class PrettyAchievementsUI {
         this.isScanning = false;
         this.scanSeq = 0;
         this.rescanRequested = false;
+        this.lastDetectedCrackedGames = null; // cache dernier résultat non vide
 
         this.initializeElements();
         this.initializeDemoData();
+        this.ensureRescanButton();
         this.bindEvents(); // ✅ Doit inclure les events burger
         this.bindSteamEvents();
         this.loadDashboard();
         this.ensureAchievementCountStyles();
         this.scanOnStartup();
+        this.loadConfigOnStartup();
 
         // Écoute des jeux détectés depuis le main process
         if (window.electronAPI?.on) {
             window.electronAPI.on('games/detected', (data) => {
                 try {
-                    this.detectedCrackedGames = data || {};
+                    const incoming = (data && typeof data === 'object') ? data : {};
+                    const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
+                    const prevCount = Object.keys(prev).length;
+                    const newCount = Object.keys(incoming).length;
+                    // Ne pas écraser les jeux déjà détectés par un résultat vide
+                    if (newCount > 0 || prevCount === 0) {
+                        this.detectedCrackedGames = incoming;
+                        if (newCount > 0) this.lastDetectedCrackedGames = incoming;
+                    }
                     this.renderDetectedCrackedGames();
                     this.renderSidebarGames();
                 } catch (e) { console.warn('render cracked games failed:', e); }
@@ -29,7 +40,12 @@ class PrettyAchievementsUI {
             if (!this.detectedCrackedGames && window.electronAPI?.invoke) {
                 try {
                     const data = await window.electronAPI.invoke('games/detect-cracked');
-                    this.detectedCrackedGames = data || {};
+                    const incoming = (data && typeof data === 'object') ? data : {};
+                    const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
+                    if (Object.keys(incoming).length > 0 || Object.keys(prev).length === 0) {
+                        this.detectedCrackedGames = incoming;
+                        if (Object.keys(incoming).length > 0) this.lastDetectedCrackedGames = incoming;
+                    }
                     this.renderDetectedCrackedGames();
                     this.renderSidebarGames();
                 } catch (e) { /* ignore */ }
@@ -111,8 +127,18 @@ class PrettyAchievementsUI {
             });
         }
 
+        // ✅ BOUTON RESCAN (top-right)
+        this.rescanBtn = document.getElementById('rescanMenuBtn');
+        if (this.rescanBtn) {
+            this.rescanBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.scanAndLoadGames();
+            });
+        }
+
         // ✅ EVENTS SETTINGS
         this.bindSettingsEvents();
+        this.bindSaveSettings();
     }
 
     // ✅ GESTION SIDEBAR
@@ -180,15 +206,19 @@ class PrettyAchievementsUI {
             targetMenuItem.classList.add('active');
         }
 
+        // Masquer le bouton rescan par défaut
+        const rescan = document.getElementById('rescanMenuBtn');
+        if (rescan) rescan.style.display = 'none';
+
         // Charger le contenu selon la section
         switch(sectionId) {
             case 'games':
-                if (this.skipNextGamesScan) {
-                    this.skipNextGamesScan = false;
-                    this.loadGames();
-                } else {
-                    this.scanAndLoadGames();
+                this.loadGames();
+                // If a scan is already running (e.g., startup), mirror the loader into the games page without triggering a scan
+                if (this.isScanning) {
+                    this.ensureGamesLoaderVisible();
                 }
+                if (rescan) rescan.style.display = 'flex';
                 break;
             case 'achievements':
                 this.loadAchievements();
@@ -269,7 +299,8 @@ class PrettyAchievementsUI {
         const localScanId = ++this.scanSeq;
 
         const gamesGrid = document.getElementById('gamesGrid');
-        if (gamesGrid) gamesGrid.innerHTML = '';
+        const prevCount = this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object' ? Object.keys(this.detectedCrackedGames).length : 0;
+        if (prevCount === 0 && gamesGrid) gamesGrid.innerHTML = '';
         this.showGamesLoading();
         try {
             let data = null;
@@ -279,7 +310,10 @@ class PrettyAchievementsUI {
                 if (count === 0) {
                     await this.sleep(800);
                     const retry = await window.electronAPI.invoke('games/detect-cracked').catch(() => null);
-                    if (retry) data = retry;
+                    if (retry) {
+                        data = retry;
+                        count = data && typeof data === 'object' ? Object.keys(data).length : 0;
+                    }
                 }
             }
 
@@ -288,8 +322,18 @@ class PrettyAchievementsUI {
                 return;
             }
 
-            this.detectedCrackedGames = data || {};
-            await this.loadGames();
+            const prevCount = this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object' ? Object.keys(this.detectedCrackedGames).length : 0;
+            const newCount = data && typeof data === 'object' ? Object.keys(data).length : 0;
+            if (newCount > 0 || prevCount === 0) {
+                // Remplacer uniquement si on a de nouvelles données, ou si on n'avait rien avant
+                this.detectedCrackedGames = data || {};
+                if (newCount > 0) this.lastDetectedCrackedGames = this.detectedCrackedGames;
+            }
+            if (newCount === 0 && prevCount === 0 && (!this.lastDetectedCrackedGames || Object.keys(this.lastDetectedCrackedGames).length === 0)) {
+                this.renderNoGamesEmptyState();
+            } else {
+                await this.loadGames();
+            }
             this.renderSidebarGames();
         } catch (e) {
             console.warn('games detection failed:', e);
@@ -355,6 +399,40 @@ class PrettyAchievementsUI {
             if (barSide) barSide.style.width = progress + '%';
         }, 300);
     }
+    ensureGamesLoaderVisible() {
+        try {
+            const gamesSection = document.getElementById('games');
+            if (!gamesSection || !gamesSection.classList.contains('active')) return;
+            let el = this.gamesLoadingEl || document.getElementById('gamesLoading');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'gamesLoading';
+                el.className = 'games-loading';
+                this.gamesLoadingEl = el;
+            }
+            const h1 = gamesSection.querySelector('h1');
+            if (h1) {
+                if (el.parentNode !== gamesSection || el.previousElementSibling !== h1) {
+                    gamesSection.insertBefore(el, h1.nextSibling);
+                }
+            } else if (!el.parentNode) {
+                gamesSection.insertBefore(el, gamesSection.firstChild);
+            }
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.flexDirection = 'column';
+            el.style.padding = '10px 0';
+            el.style.rowGap = '6px';
+            el.innerHTML = `
+                <div class="loading-spinner">⚡</div>
+                <p>Scan des jeux...</p>
+                <div id="gamesProgressBar" style="width:80%;max-width:420px;height:8px;border-radius:4px;background:#1b1b1b;border:1px solid #333;overflow:hidden;margin-top:6px;">
+                  <div id="gamesProgressBarInner" style="height:100%;width:0%;background:linear-gradient(90deg, #679CDF, #5489CC);transition:width 0.3s ease;"></div>
+                </div>
+            `;
+        } catch (_) { /* ignore */ }
+    }
     hideGamesLoading(done = false) {
         const el = this.gamesLoadingEl || document.getElementById('gamesLoading');
         if (this._progressTimer) {
@@ -387,12 +465,22 @@ class PrettyAchievementsUI {
                 <div id="sidebarProgressBarInner" style="height:100%;width:0%;background:linear-gradient(90deg, #679CDF, #5489CC);transition:width 0.3s ease;"></div>
             </div>
         `;
+        // Mirror loader in games page if open, without triggering a scan
+        this.ensureGamesLoaderVisible();
     }
     hideSidebarLoading(done = false) {
         const container = this.sidebarListEl || document.querySelector('.scrollable-content');
         if (!container) return;
         setTimeout(() => {
             container.style.display = '';
+            // Also finalize and hide the loader in the games page if present
+            const barMain = document.getElementById('gamesProgressBarInner');
+            if (barMain && done) barMain.style.width = '100%';
+            const gamesEl = this.gamesLoadingEl || document.getElementById('gamesLoading');
+            if (gamesEl) {
+                gamesEl.style.display = 'none';
+                gamesEl.innerHTML = '';
+            }
         }, done ? 150 : 0);
     }
     renderSidebarGames() {
@@ -434,10 +522,17 @@ class PrettyAchievementsUI {
                 if (progress > 90) progress = 90;
                 const barSide = document.getElementById('sidebarProgressBarInner');
                 if (barSide) barSide.style.width = progress + '%';
+                const barMain = document.getElementById('gamesProgressBarInner');
+                if (barMain) barMain.style.width = progress + '%';
             }, 300);
 
             const data = await window.electronAPI.invoke('games/detect-cracked');
-            this.detectedCrackedGames = data || {};
+            const incoming = (data && typeof data === 'object') ? data : {};
+            const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
+            if (Object.keys(incoming).length > 0 || Object.keys(prev).length === 0) {
+                this.detectedCrackedGames = incoming;
+                if (Object.keys(incoming).length > 0) this.lastDetectedCrackedGames = incoming;
+            }
             this.renderSidebarGames();
         } catch (e) {
             console.warn('startup scan failed:', e);
@@ -462,7 +557,7 @@ class PrettyAchievementsUI {
 
         if (toRender.length === 0) {
             gamesGrid.innerHTML = `
-                <div class="no-results" style="display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;min-height:200px;gap:6px;">
+                <div class="no-results" style="display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;min-height:200px;gap:6px;grid-column:1 / -1;justify-self:center;width:100%;">
                     <h3 style="margin:0;">Aucun jeu détecté</h3>
                     <p style="margin:0;color:var(--text-secondary);">Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
                 </div>
@@ -490,8 +585,12 @@ class PrettyAchievementsUI {
         const logoCandidate = appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/logo.png` : '';
 
         if (enableImages && appId) {
-            // Toujours tenter de récupérer le logo
-            logoUrl = logoCandidate;
+            // Afficher le logo uniquement si le mode n'est pas "Header"
+            if (quality !== 'medium') {
+                logoUrl = logoCandidate;
+            } else {
+                logoUrl = '';
+            }
             if (quality === 'high') {
                 headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_hero.jpg`;
             } else if (quality === 'low') {
@@ -531,7 +630,10 @@ class PrettyAchievementsUI {
     loadStatistics() { /* ... votre code stats ... */ }
     getDetectedGames() {
         try {
-            const dict = this.detectedCrackedGames || {};
+            const base = this.detectedCrackedGames || {};
+            const dict = (Object.keys(base).length === 0 && this.lastDetectedCrackedGames && Object.keys(this.lastDetectedCrackedGames).length > 0)
+                ? this.lastDetectedCrackedGames
+                : base;
             return Object.keys(dict).map(k => {
                 const raw = dict[k];
                 let name = `App ${k}`;
@@ -566,6 +668,22 @@ class PrettyAchievementsUI {
         return merged;
     }
     // ... toutes vos autres méthodes Steam etc.
+
+    ensureRescanButton() {
+        try {
+            if (!document.getElementById('rescanMenuBtn')) {
+                const gamesSection = document.getElementById('games');
+                if (!gamesSection) return;
+                const btn = document.createElement('button');
+                btn.id = 'rescanMenuBtn';
+                btn.className = 'rescan-menu';
+                btn.title = 'Rescanner les jeux';
+                btn.textContent = '↻';
+                btn.style.display = 'none';
+                gamesSection.appendChild(btn);
+            }
+        } catch (_) { /* ignore */ }
+    }
 
     // ✅ SETTINGS EVENTS
     bindSettingsEvents() {
@@ -623,6 +741,74 @@ class PrettyAchievementsUI {
                 }
             });
         }
+    }
+
+    bindSaveSettings() {
+        const btn = document.getElementById('saveSettingsBtn');
+        if (!btn) return;
+        const setIdle = () => {
+            btn.style.background = 'var(--primary-color)';
+            btn.textContent = 'Enregistrer';
+            btn.disabled = false;
+            btn.style.opacity = '';
+        };
+        const setSuccess = () => {
+            btn.style.background = '#28a745';
+            btn.textContent = 'Enregistré ✔';
+        };
+        const setError = () => {
+            btn.style.background = '#dc3545';
+            btn.textContent = 'Erreur ✖';
+        };
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            btn.disabled = true;
+            btn.style.opacity = '0.9';
+            const payload = this.collectSettingsPayload();
+            try {
+                const res = await window.electronAPI?.invoke?.('config/save', payload);
+                if (res && res.ok) {
+                    setSuccess();
+                } else {
+                    setError();
+                }
+            } catch (_) {
+                setError();
+            } finally {
+                setTimeout(() => setIdle(), 1500);
+            }
+        });
+    }
+
+    collectSettingsPayload() {
+        const getVal = (id, fallback = '') => (document.getElementById(id)?.value ?? fallback);
+        const getBool = (id) => !!document.getElementById(id)?.checked;
+        const getNum = (id, fallback = 0) => {
+            const v = Number(document.getElementById(id)?.value);
+            return Number.isFinite(v) ? v : fallback;
+        };
+        // Collect basic settings used in UI
+        const payload = {
+            general: {
+                autoStart: getBool('autoStart'),
+                notifications: getBool('notifications'),
+                minimizeToTray: getBool('minimizeToTray'),
+                refreshEveryMinutes: getNum('refreshEveryMinutes', 15)
+            },
+            images: {
+                enableSteamImages: getBool('enableSteamImages'),
+                steamImageQuality: getVal('steamImageQuality', 'medium'),
+                imageCacheDuration: getNum('imageCacheDuration', 7)
+            },
+            detection: {
+                folders: Array.from(document.querySelectorAll('#addedScanFolders .folder-path strong')).map(el => el.textContent)
+            },
+            cache: {
+                autoRefreshCache: getBool('autoRefreshCache'),
+                cacheDuration: getNum('cacheDuration', 24)
+            }
+        };
+        return payload;
     }
 
     // ===== Dossiers à scanner - helpers =====
@@ -719,6 +905,34 @@ class PrettyAchievementsUI {
 
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+    async loadConfigOnStartup() {
+        try {
+            const cfg = await window.electronAPI?.invoke?.('config/load');
+            if (!cfg || typeof cfg !== 'object') return;
+            const setBool = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+            const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = String(v); };
+
+            // general
+            setBool('autoStart', cfg?.general?.autoStart);
+            setBool('notifications', cfg?.general?.notifications);
+            setBool('minimizeToTray', cfg?.general?.minimizeToTray);
+            // images
+            setBool('enableSteamImages', cfg?.images?.enableSteamImages);
+            setVal('steamImageQuality', cfg?.images?.steamImageQuality);
+            setVal('imageCacheDuration', cfg?.images?.imageCacheDuration);
+            // general extra
+            setVal('refreshEveryMinutes', cfg?.general?.refreshEveryMinutes);
+            // cache
+            setBool('autoRefreshCache', cfg?.cache?.autoRefreshCache);
+            setVal('cacheDuration', cfg?.cache?.cacheDuration);
+            // detection folders
+            if (Array.isArray(cfg?.detection?.folders)) {
+                this.scanFolders = [...cfg.detection.folders];
+                this.renderScanFolders();
+            }
+        } catch (_) { /* ignore */ }
+    }
+
     ensureAchievementCountStyles() {
         try {
             if (document.getElementById('achievement-count-styles')) return;
@@ -730,6 +944,19 @@ class PrettyAchievementsUI {
             style.id = 'achievement-count-styles';
             style.textContent = css;
             document.head.appendChild(style);
+        } catch (_) { /* ignore */ }
+    }
+
+    renderNoGamesEmptyState() {
+        try {
+            const gamesGrid = document.getElementById('gamesGrid');
+            if (!gamesGrid) return;
+            gamesGrid.innerHTML = `
+                <div class="no-results" style="display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;min-height:200px;gap:6px;grid-column:1 / -1;justify-self:center;width:100%;">
+                    <h3 style="margin:0;">Aucun jeu détecté</h3>
+                    <p style="margin:0;color:var(--text-secondary);">Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
+                </div>
+            `;
         } catch (_) { /* ignore */ }
     }
 

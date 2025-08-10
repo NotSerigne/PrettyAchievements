@@ -47,8 +47,8 @@
             <span class="menu-tooltip">Jeux</span>
         </div>
         <div class="menu-item" data-section="achievements">
-            <span class="menu-icon">🏆</span>
-            <span class="menu-tooltip">Succès</span>
+            <span class="menu-icon">📈</span>
+            <span class="menu-tooltip">Stats</span>
         </div>
         <div class="menu-item" data-section="settings">
             <span class="menu-icon">⚙️</span>
@@ -140,6 +140,14 @@
                             <span class="switch" aria-hidden="true"></span>
                         </div>
                     </div>
+
+                    <div class="setting-item">
+                        <div class="setting-toggle">
+                            <label for="refreshEveryMinutes">Rafraîchissement toutes les</label>
+                            <input type="number" id="refreshEveryMinutes" min="1" max="10080" value="15" style="width:90px;margin-left:auto;">
+                            <span style="margin-left:8px;color:var(--text-secondary)">minutes</span>
+                        </div>
+                    </div>
                 </div>
             <div class="settings-group">
                 <h3>Images</h3>
@@ -204,17 +212,22 @@
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>Durée cache (heures)</label>
-                    <label for="cacheDuration"></label><input type="number" id="cacheDuration" min="1" max="168" value="24">
+                    <div class="setting-toggle">
+                        <label for="cacheDuration">Durée cache</label>
+                        <input type="number" id="cacheDuration" min="1" max="168" value="24" style="width:90px;margin-left:auto;">
+                        <span style="margin-left:8px;color:var(--text-secondary)">heures</span>
+                    </div>
                 </div>
                 <div class="setting-item">
                     <div class="cache-actions">
                         <button class="clear-cache-btn">Vider le Cache</button>
                         <button class="refresh-cache-btn">Rafraîchir</button>
                     </div>
+                    <div id="saveSettingsFeedback" style="margin-top:8px;font-size:0.9rem;color:var(--text-secondary);"></div>
                 </div>
             </div>
         </div>
+        <button id="saveSettingsBtn" class="settings-save-floating" style="position: fixed; right: 24px; bottom: 24px; padding: 12px 18px; border: none; border-radius: 8px; background: var(--primary-color); color: #fff; box-shadow: 0 6px 16px rgba(103,156,223,0.4); cursor: pointer; z-index: 10;">Enregistrer</button>
     </div>
 </main>
 
