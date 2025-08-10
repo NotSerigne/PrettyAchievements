@@ -1,6 +1,7 @@
 // pretty-achievements/electron-app/src/main.js
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === 'true';
 
@@ -34,6 +35,50 @@ function createMainWindow() {
     return win;
 }
 
+// Python game detector integration
+function runGameDetector() {
+    return new Promise((resolve, reject) => {
+        try {
+            const pythonSrc = path.resolve(__dirname, '..', '..', 'python-backend', 'src');
+            const code = [
+                'import sys, json',
+                `sys.path.append(r"${pythonSrc.replace(/\\/g, '\\\\')}")`,
+                'from game_detector import GameDetector',
+                'd = GameDetector()',
+                'd.scan_all_locations()',
+                'd.get_all_games_names()',
+                'print(json.dumps(d.games, ensure_ascii=False))'
+            ].join('; ');
+
+            const py = process.platform === 'win32' ? 'python' : 'python3';
+            const child = spawn(py, ['-c', code], { windowsHide: true });
+
+            let stdout = '';
+            let stderr = '';
+
+            child.stdout.on('data', (d) => { stdout += d.toString(); });
+            child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+            child.on('error', (err) => reject(err));
+
+            child.on('close', (code) => {
+                if (code !== 0) {
+                    return reject(new Error(`Python exited with code ${code}: ${stderr}`));
+                }
+                try {
+                    const parsed = JSON.parse(stdout || '{}');
+                    resolve(parsed);
+                } catch (e) {
+                    console.error('Failed to parse Python output:', stdout);
+                    resolve({});
+                }
+            });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
 // Empêcher plusieurs instances
 if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -48,7 +93,17 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     app.whenReady().then(() => {
-        createMainWindow();
+        const win = createMainWindow();
+
+        // Exécuter le détecteur au démarrage et envoyer le résultat au renderer
+        runGameDetector()
+            .then((data) => {
+                try { win.webContents.send('games/detected', data); } catch (_) {}
+            })
+            .catch((err) => {
+                console.error('Erreur detection jeux:', err);
+                try { win.webContents.send('games/detected', {}); } catch (_) {}
+            });
 
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
@@ -66,3 +121,6 @@ if (!app.requestSingleInstanceLock()) {
   - ipcMain.handle('backend/start', async () => { ... })
 */
 ipcMain.handle('app/get-app-path', () => app.getAppPath());
+ipcMain.handle('games/detect-cracked', async () => {
+    try { return await runGameDetector(); } catch (e) { return {}; }
+});

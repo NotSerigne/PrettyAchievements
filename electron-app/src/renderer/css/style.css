@@ -458,7 +458,7 @@ body {
     height: 200px;
     position: relative;
     border: 3px solid #1b1b1b;
-    border-radius: 8px 8px 0 0;
+    border-radius: 8px 8px 8px 8px;
     margin: 8px 8px 0 8px;
     filter: brightness(0.6);
     transition: filter 0.3s ease;
@@ -793,20 +793,6 @@ body {
     transition: all 0.3s ease;
     flex-shrink: 0;
     pointer-events: none;
-}
-
-/* Cache la checkbox native */
-.setting-toggle input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 54px;
-    height: 28px;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    z-index: 10;
-    margin: 0;
 }
 
 /* État activé du switch */

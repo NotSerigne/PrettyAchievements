@@ -7,8 +7,27 @@ class PrettyAchievementsUI {
         this.bindEvents(); // ✅ Doit inclure les events burger
         this.bindSteamEvents();
         this.loadDashboard();
-        this.loadSettingsFromLocalStorage();
-        this.initSGDBClient();
+
+        // Écoute des jeux détectés depuis le main process
+        if (window.electronAPI?.on) {
+            window.electronAPI.on('games/detected', (data) => {
+                try {
+                    this.detectedCrackedGames = data || {};
+                    this.renderDetectedCrackedGames();
+                } catch (e) { console.warn('render cracked games failed:', e); }
+            });
+        }
+
+        // Fallback: tenter une détection à la demande si rien reçu
+        setTimeout(async () => {
+            if (!this.detectedCrackedGames && window.electronAPI?.invoke) {
+                try {
+                    const data = await window.electronAPI.invoke('games/detect-cracked');
+                    this.detectedCrackedGames = data || {};
+                    this.renderDetectedCrackedGames();
+                } catch (e) { /* ignore */ }
+            }
+        }, 3000);
     }
 
     initializeElements() {
@@ -171,14 +190,14 @@ class PrettyAchievementsUI {
         console.log('🔍 Search:', query);
 
         if (!query.trim()) {
-            // Trafficker tous les jeux
             this.loadGames().then(() =>{} );
             return;
         }
 
-        // Filtrer les jeux
-        const filteredGames = this.demoData.games.filter(game =>
-            game.name.toLowerCase().includes(query.toLowerCase())
+        // Filtrer sur l'ensemble des jeux (détectés + démo)
+        const allGames = this.getAllGames();
+        const filteredGames = allGames.filter(game =>
+            (game.name || '').toLowerCase().includes(query.toLowerCase())
         );
 
         this.displayFilteredGames(filteredGames);
@@ -201,22 +220,118 @@ class PrettyAchievementsUI {
         }
 
         games.forEach(game => {
-            const progress = Math.round((game.unlocked / game.achievements) * 100);
+            const achievements = Number(game.achievements || 0);
+            const unlocked = Number(game.unlocked || 0);
+            const progress = achievements > 0 ? Math.round((unlocked / achievements) * 100) : 0;
             const gameCard = document.createElement('div');
             gameCard.className = 'game-card';
-            gameCard.onclick = () => this.showGameDetails(game);
             gameCard.innerHTML = this.createGameCardHTML(game, progress, null);
             gamesGrid.appendChild(gameCard);
         });
     }
 
+    renderDetectedCrackedGames() {
+        // Rafraîchir la grille des jeux si la section est visible
+        const gamesSection = document.getElementById('games');
+        if (!gamesSection) return;
+        const isActive = gamesSection.classList.contains('active');
+        if (isActive) {
+            this.loadGames();
+        }
+    }
+
     // ===== VOS MÉTHODES EXISTANTES (inchangées) =====
     bindSteamEvents() { /* ... votre code Steam ... */ }
-    async loadGames() { /* ... votre code games ... */ }
-    createGameCardHTML(game, progress, steamData) { /* ... votre code template ... */ }
+    async loadGames() {
+        const gamesGrid = document.getElementById('gamesGrid');
+        if (!gamesGrid) return;
+
+        gamesGrid.innerHTML = '';
+
+        const detected = this.getDetectedGames();
+        const demo = Array.isArray(this.demoData?.games) ? this.demoData.games : [];
+
+        const toRender = detected.length ? detected : demo;
+
+        if (toRender.length === 0) {
+            gamesGrid.innerHTML = `
+                <div class="no-results">
+                    <h3>Aucun jeu détecté</h3>
+                    <p>Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
+                </div>
+            `;
+            return;
+        }
+
+        toRender.forEach(game => {
+            const achievements = Number(game.achievements || 0);
+            const unlocked = Number(game.unlocked || 0);
+            const progress = achievements > 0 ? Math.round((unlocked / achievements) * 100) : 0;
+            const gameCard = document.createElement('div');
+            gameCard.className = 'game-card';
+            gameCard.innerHTML = this.createGameCardHTML(game, progress, null);
+            gamesGrid.appendChild(gameCard);
+        });
+    }
+    createGameCardHTML(game, progress, steamData) {
+        const appId = game.steamAppId || game.appId || game.id || '';
+        const name = game.name || `App ${appId}`;
+        const enableImages = !!document.getElementById('enableSteamImages')?.checked;
+        const quality = document.getElementById('steamImageQuality')?.value || 'medium';
+        let headerUrl = '';
+        let logoUrl = '';
+
+        if (enableImages && appId) {
+            if (quality === 'high') {
+                headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_hero.jpg`;
+                logoUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/logo.png`;
+            } else if (quality === 'low') {
+                headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_616x353.jpg`;
+            } else {
+                headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
+            }
+        }
+
+        return `
+          <div class="game-card-header ${headerUrl ? '' : 'no-image'}">
+            ${headerUrl ? `<img src="${headerUrl}" alt="${this.escapeHtml(name)}" onload="this.classList.add('loaded')" referrerpolicy="no-referrer">` : ''}
+            ${logoUrl ? `<img class=\"game-logo\" src=\"${logoUrl}\" alt=\"${this.escapeHtml(name)}\" referrerpolicy=\"no-referrer\">` : `<div class=\"game-title-fallback\">${this.escapeHtml(name)}</div>`}
+            ${appId ? `<div class=\"steam-badge\">AppID: ${appId}</div>` : ''}
+          </div>
+          <div class="game-card-body">
+            <div class="game-progress-container">
+              <div class="progress-bar"><div class="progress" style="width:${progress}%"></div></div>
+              <div class="progress-text">${progress}% complété</div>
+            </div>
+          </div>
+        `;
+    }
     loadDashboard() { /* ... votre code dashboard ... */ }
     loadAchievements() { /* ... votre code achievements ... */ }
     loadStatistics() { /* ... votre code stats ... */ }
+    getDetectedGames() {
+        try {
+            const dict = this.detectedCrackedGames || {};
+            return Object.keys(dict).map(k => ({
+                id: Number(k),
+                steamAppId: Number(k),
+                name: String(dict[k] || `App ${k}`),
+                achievements: 0,
+                unlocked: 0
+            }));
+        } catch (e) { return []; }
+    }
+    getAllGames() {
+        const detected = this.getDetectedGames();
+        const demo = Array.isArray(this.demoData?.games) ? this.demoData.games : [];
+        const seen = new Set(detected.map(g => g.steamAppId || g.id));
+        const merged = detected.slice();
+        demo.forEach(g => {
+            const key = g.steamAppId || g.id;
+            if (!seen.has(key)) merged.push(g);
+        });
+        return merged;
+    }
     // ... toutes vos autres méthodes Steam etc.
 
     // ✅ SETTINGS EVENTS

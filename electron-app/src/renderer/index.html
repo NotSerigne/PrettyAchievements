@@ -190,49 +190,19 @@
                     </div>
                     <div class="setting-item">
                         <label>Dossiers ajoutés</label>
-                        <label id="addedScanFolders" class="added-folders-list">
+                        <ul id="addedScanFolders" class="added-folders-list">
                             <!-- Les dossiers ajoutés s'afficheront ici -->
-                        </label>
+                        </ul>
                     </div>
                 </div>
-
-            <div class="settings-group">
-                <h3>Fichiers de Succès</h3>
-                <div class="setting-item">
-                    <label>Scanner fichiers .ini</label>
-                    <label for="scanIniFiles"></label><input type="checkbox" id="scanIniFiles" checked>
-                </div>
-                <div class="setting-item">
-                    <label>Scanner fichiers .cfg</label>
-                    <label for="scanCfgFiles"></label><input type="checkbox" id="scanCfgFiles">
-                </div>
-                <div class="setting-item">
-                    <label>Extensions personnalisées</label>
-                    <label for="customExtensions"></label><input type="text" id="customExtensions" placeholder=".ach, .save, .dat">
-                </div>
-            </div>
-
-            <div class="settings-group">
-                <h3>Affichage</h3>
-                <div class="setting-item">
-                    <label>Thème sombre</label>
-                    <label for="darkTheme"></label><input type="checkbox" id="darkTheme" checked>
-                </div>
-                <div class="setting-item">
-                    <label>Afficher icônes des jeux</label>
-                    <label for="showGameIcons"></label><input type="checkbox" id="showGameIcons" checked>
-                </div>
-                <div class="setting-item">
-                    <label>Vue compacte</label>
-                    <label for="compactView"></label><input type="checkbox" id="compactView">
-                </div>
-            </div>
-
             <div class="settings-group">
                 <h3>Cache & Performance</h3>
                 <div class="setting-item">
-                    <label>Auto-rafraîchir le cache</label>
-                    <label for="autoRefreshCache"></label><input type="checkbox" id="autoRefreshCache" checked>
+                    <div class="setting-toggle">
+                        <label for="autoRefreshCache">Automatiquement rafraîchir le cache</label>
+                        <input type="checkbox" id="autoRefreshCache" checked>
+                        <span class="switch" aria-hidden="true"></span>
+                    </div>
                 </div>
                 <div class="setting-item">
                     <label>Durée cache (heures)</label>
