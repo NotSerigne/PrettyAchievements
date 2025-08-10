@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pretty Achievements</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- Overlay for sidebar -->
+<div class="overlay" id="overlay"></div>
+
+<!-- Menu burger button -->
+<button class="burger-menu" id="burgerMenu">
+    <span></span>
+    <span></span>
+    <span></span>
+</button>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h2>Pretty Achievements</h2>
+    </div>
+
+    <!-- ✅ Section principale avec search et contenu scrollable -->
+    <div class="menu-main-section">
+        <div class="search-container">
+            <label for="searchBar"></label><input type="text" class="search-bar" id="searchBar" placeholder="Rechercher un jeu...">
+            <span class="search-icon">🔍</span>
+        </div>
+
+        <!-- Ici va le contenu scrollable comme les jeux, settings, etc. -->
+        <div class="scrollable-content">
+            <!-- Contenu qui peut scroller -->
+        </div>
+    </div>
+
+    <!-- ✅ Menu items fixés en bas -->
+    <div class="menu-items">
+        <div class="menu-item active" data-section="dashboard">
+            <span class="menu-icon">🏠</span>
+            <span class="menu-tooltip">Dashboard</span>
+        </div>
+        <div class="menu-item" data-section="games">
+            <span class="menu-icon">🎮</span>
+            <span class="menu-tooltip">Jeux</span>
+        </div>
+        <div class="menu-item" data-section="achievements">
+            <span class="menu-icon">🏆</span>
+            <span class="menu-tooltip">Succès</span>
+        </div>
+        <div class="menu-item" data-section="settings">
+            <span class="menu-icon">⚙️</span>
+            <span class="menu-tooltip">Réglages</span>
+        </div>
+    </div>
+</div>
+
+<!-- Main content -->
+<main class="main-content" id="mainContent">
+    <!-- ===== DASHBOARD ===== -->
+    <div class="content-section active" id="dashboard">
+        <h1>Tableau de bord</h1>
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <h3>Jeux Totaux</h3>
+                <div class="stat-number" id="totalGames">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Succès Totaux</h3>
+                <div class="stat-number" id="totalAchievements">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Succès Débloqués</h3>
+                <div class="stat-number" id="unlockedAchievements">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Taux de Complétion</h3>
+                <div class="stat-number" id="completionRate">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== GAMES AVEC IMAGES STEAM ===== -->
+    <div class="content-section" id="games">
+        <h1>Mes Jeux</h1>
+        <div class="games-loading" id="gamesLoading" style="display: none;">
+            <div class="loading-spinner">⚡</div>
+            <p>Chargement des images Steam...</p>
+        </div>
+        <div class="games-grid" id="gamesGrid">
+            <!-- ✨ Template pour chaque jeu avec images Steam -->
+        </div>
+    </div>
+
+    <!-- ===== ACHIEVEMENTS ===== -->
+    <div class="content-section" id="achievements">
+        <h1>Succès</h1>
+        <div class="achievements-container" id="achievementsContainer">
+            <!-- Achievements will be added dynamically -->
+        </div>
+    </div>
+
+    <!-- ===== STATISTICS ===== -->
+    <div class="content-section" id="statistics">
+        <h1>Statistiques</h1>
+        <div class="dashboard-grid" id="statisticsContainer">
+            <!-- Statistics will be added dynamically -->
+        </div>
+    </div>
+
+    <!-- ===== SETTINGS AVEC OPTIONS STEAM ===== -->
+    <div class="content-section" id="settings">
+        <h1>Paramètres</h1>
+        <div class="settings-container">
+            <div class="settings-group">
+                <h3>Général</h3>
+
+                    <div class="setting-item">
+                        <div class="setting-toggle">
+                            <label for="autoStart">Démarrage automatique</label>
+                            <input type="checkbox" id="autoStart">
+                            <span class="switch" aria-hidden="true"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <div class="setting-toggle">
+                            <label for="notifications">Notifications</label>
+                            <input type="checkbox" id="notifications" checked>
+                            <span class="switch" aria-hidden="true"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <div class="setting-toggle">
+                            <label for="minimizeToTray">Minimiser dans la barre</label>
+                            <input type="checkbox" id="minimizeToTray">
+                            <span class="switch" aria-hidden="true"></span>
+                        </div>
+                    </div>
+                </div>
+            <div class="settings-group">
+                <h3>Images</h3>
+                    <div class="setting-item">
+                        <div class="setting-toggle">
+                            <label for="enableSteamImages">Charger images Steam officielles</label>
+                            <input type="checkbox" id="enableSteamImages" checked>
+                            <span class="switch" aria-hidden="true"></span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Type d'image</label>
+                        <label for="steamImageQuality"></label><select id="steamImageQuality">
+                            <option value="high">Hero + Logo</option>
+                            <option value="medium">Header</option>
+                            <option value="low">Capsule</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Cache images (jours)</label>
+                        <label for="imageCacheDuration"></label><input type="number" id="imageCacheDuration" min="1" max="30" value="7">
+                    </div>
+                    <div class="setting-item">
+                        <div class="cache-actions">
+                            <button class="test-steam-btn">🧪 Tester Steam</button>
+                            <button class="clear-image-cache-btn">🗑️ Vider Cache Images</button>
+                        </div>
+                    </div>
+            </div>
+
+                <div class="settings-group">
+                    <h3>Détection des Jeux</h3>
+                    <div class="setting-item">
+                        <h4>Dossiers par défaut recherchés :</h4>
+                        <ul class="default-paths">
+                            <li>📁 <strong>%public%/documents/steam/rune/[AppID]/achievements.ini</strong></li>
+                            <li>📁 <strong>%public%/documents/steam/codex/[AppID]/achievements.ini</strong></li>
+                            <li>📁 <strong>%appdata%/steam/codex/[AppID]/achievements.ini</strong></li>
+                        </ul>
+                    </div>
+                    <div class="setting-item">
+                        <label>Ajouter un dossier à scanner</label>
+                        <div class="folder-input-group">
+                            <label for="scanFolderPath"></label><input type="text" id="scanFolderPath" placeholder="Sélectionner un dossier...">
+                            <button class="browse-btn" data-target="scanFolderPath">Parcourir</button>
+                            <button class="browse-btn add-folder-btn" id="addScanFolderBtn">Ajouter</button>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Dossiers ajoutés</label>
+                        <label id="addedScanFolders" class="added-folders-list">
+                            <!-- Les dossiers ajoutés s'afficheront ici -->
+                        </label>
+                    </div>
+                </div>
+
+            <div class="settings-group">
+                <h3>Fichiers de Succès</h3>
+                <div class="setting-item">
+                    <label>Scanner fichiers .ini</label>
+                    <label for="scanIniFiles"></label><input type="checkbox" id="scanIniFiles" checked>
+                </div>
+                <div class="setting-item">
+                    <label>Scanner fichiers .cfg</label>
+                    <label for="scanCfgFiles"></label><input type="checkbox" id="scanCfgFiles">
+                </div>
+                <div class="setting-item">
+                    <label>Extensions personnalisées</label>
+                    <label for="customExtensions"></label><input type="text" id="customExtensions" placeholder=".ach, .save, .dat">
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Affichage</h3>
+                <div class="setting-item">
+                    <label>Thème sombre</label>
+                    <label for="darkTheme"></label><input type="checkbox" id="darkTheme" checked>
+                </div>
+                <div class="setting-item">
+                    <label>Afficher icônes des jeux</label>
+                    <label for="showGameIcons"></label><input type="checkbox" id="showGameIcons" checked>
+                </div>
+                <div class="setting-item">
+                    <label>Vue compacte</label>
+                    <label for="compactView"></label><input type="checkbox" id="compactView">
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Cache & Performance</h3>
+                <div class="setting-item">
+                    <label>Auto-rafraîchir le cache</label>
+                    <label for="autoRefreshCache"></label><input type="checkbox" id="autoRefreshCache" checked>
+                </div>
+                <div class="setting-item">
+                    <label>Durée cache (heures)</label>
+                    <label for="cacheDuration"></label><input type="number" id="cacheDuration" min="1" max="168" value="24">
+                </div>
+                <div class="setting-item">
+                    <div class="cache-actions">
+                        <button class="clear-cache-btn">Vider le Cache</button>
+                        <button class="refresh-cache-btn">Rafraîchir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script src="js/app.js"></script>
+</body>
+</html>

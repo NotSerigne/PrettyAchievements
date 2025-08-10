@@ -1,0 +1,1168 @@
+:root {
+    --primary-color: #679CDF;
+    --primary-dark: #5489CC;
+    --bg-color: #1a1a1a;
+    --card-bg: #2a2a2a;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-color: #404040;
+    --hover-bg: #3a3a3a;
+    --shadow: rgba(0, 0, 0, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* ===== OVERLAY ===== */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ===== BURGER MENU BLEU ===== */
+.burger-menu {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1002;
+    background: #679CDF;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(103, 156, 223, 0.3);
+}
+
+.burger-menu:hover {
+    background: #5a8bc7;
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(103, 156, 223, 0.4);
+}
+
+.burger-menu:active {
+    transform: scale(0.95);
+}
+
+.burger-menu span {
+    display: block;
+    width: 25px;
+    height: 3px;
+    background: white;
+    border-radius: 2px;
+    margin: 3px 0;
+    transition: all 0.3s ease;
+    transform-origin: center;
+}
+
+.burger-menu.active span:nth-child(1) {
+    transform: rotate(45deg) translate(6px, 6px);
+}
+
+.burger-menu.active span:nth-child(2) {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+.burger-menu.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* ===== SIDEBAR MODIFIÉE ===== */
+.sidebar {
+    position: fixed;
+    left: -370px;
+    top: 0;
+    width: 370px;
+    height: 100vh;
+    background: var(--bg-color);
+    z-index: 1000;
+    transition: left 0.3s ease;
+    overflow: hidden; /* ✅ Pas de scroll sur la sidebar principale */
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+/* ===== SIDEBAR HEADER avec BEAUCOUP d'espace ===== */
+.sidebar-header {
+    padding: 17px 70px 20px 85px;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 90px; /* ✅ Hauteur généreuse */
+}
+
+
+.sidebar-header h2 {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 1.7rem !important;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: visible;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
+    letter-spacing: 1px; /* ✅ Espacement des lettres pour l'élégance */
+}
+
+/* Hauteur fixe (carrée visuelle) et bord plus anguleux */
+.search-bar {
+    width: 100%;
+    height: 48px;                   /* hauteur fixe => "carré" visuel */
+    padding: 0 44px 0 16px;         /* padding vertical 0 (centrage), espace pour l'icône à droite */
+    line-height: 48px;              /* pour aligner le texte verticalement dans certains navigateurs */
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.18s ease;
+    box-sizing: border-box;
+}
+
+/* Placeholder vertical centré (fallback) */
+.search-bar::placeholder {
+    color: var(--text-secondary);
+    line-height: 48px;
+}
+
+/* Icône positionnée et parfaitement centrée verticalement */
+.search-icon {
+    position: absolute;
+    right: 16px;                    /* distance depuis le bord droit */
+    top: 35%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+.search-bar:focus,
+.search-bar:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border-color: none;
+}
+
+/* ===== MENU CONTENT ===== */
+/* ===== MENU CONTENT MODIFIÉ ===== */
+.menu-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px 20px 0 20px; /* ✅ Pas de padding-bottom */
+}
+
+/* ===== SECTION PRINCIPALE (SEARCH + CONTENU) ===== */
+.menu-main-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ===== SEARCH CONTAINER (dans la section principale) ===== */
+.search-container {
+    padding: 0 0 20px 0; /* ✅ Pas de padding-top */
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* ===== MENU ITEMS EN BAS ===== */
+.menu-items {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    padding: 15px 20px 20px 20px; /* ✅ Padding final en bas */
+    overflow-x: hidden;
+    overflow-y: visible;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: var(--bg-color); /* ✅ Fond pour bien séparer */
+    border-top: 1px solid var(--border-color); /* ✅ Séparateur visuel */
+    flex-shrink: 0; /* ✅ Ne se réduit pas */
+    margin-top: auto; /* ✅ Pousse vers le bas */
+}
+
+.menu-item {
+    flex: 1;
+    min-width: 60px;
+    max-width: 80px;
+    height: 70px;
+    background: var(--card-bg);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    margin: 0;
+}
+
+.menu-item:hover {
+    background: rgba(103, 156, 223, 0.15);
+    border-color: #679CDF;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(103, 156, 223, 0.3);
+}
+
+.menu-item.active {
+    background: rgba(103, 156, 223, 0.25);
+    border-color: #679CDF;
+    color: #679CDF;
+}
+
+.menu-icon {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+    display: block;
+    line-height: 1;
+    transition: transform 0.3s ease;
+}
+
+.menu-tooltip {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    line-height: 1.2;
+}
+
+.menu-item.active .menu-tooltip {
+    color: #679CDF;
+    font-weight: 600;
+}
+
+.menu-item:hover .menu-tooltip {
+    color: var(--text-primary);
+}
+
+/* ===== MENU ITEMS HORIZONTAUX ===== */
+.menu-items {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    padding: 10px;
+    overflow-x: hidden;
+    overflow-y: visible;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.menu-item:hover {
+    background: rgba(103, 156, 223, 0.15);
+    border-color: #679CDF;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(103, 156, 223, 0.3);
+}
+
+.menu-item.active {
+    background: rgba(103, 156, 223, 0.25);
+    border-color: #679CDF;
+    color: #679CDF;
+}
+
+.menu-icon {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+    display: block;
+    line-height: 1;
+    transition: transform 0.3s ease;
+}
+
+.menu-tooltip {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    line-height: 1.2;
+}
+
+.menu-item.active .menu-tooltip {
+    color: #679CDF;
+    font-weight: 600;
+}
+
+.menu-item:hover .menu-tooltip {
+    color: var(--text-primary);
+}
+
+/* ===== MAIN CONTENT ===== */
+.main-content {
+    margin-left: 0;
+    padding: 90px 40px 40px;
+    min-height: 100vh;
+    transition: all 0.3s ease;
+}
+
+.main-content.sidebar-open {
+    margin-left: 0;
+}
+
+.content-section {
+    display: none;
+}
+
+.content-section.active {
+    display: block;
+}
+
+.content-section h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 30px;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+}
+
+/* ===== DASHBOARD GRID ===== */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 40px;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, var(--card-bg), #333333);
+    border-radius: 15px;
+    padding: 30px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px var(--shadow);
+    border-color: var(--primary-color);
+}
+
+.stat-card h3 {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.stat-card .stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+/* ===== GAMES GRID AVEC IMAGES STEAM ===== */
+.games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+    padding: 20px 0;
+}
+
+.game-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    height: 320px;
+    border: 2px solid transparent;
+}
+
+.game-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(103, 156, 223, 0.3);
+    border-color: var(--primary-color);
+}
+
+/* ===== GAME HEADER AVEC IMAGES STEAM ===== */
+.game-card-header {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 200px;
+    position: relative;
+    border: 3px solid #1b1b1b;
+    border-radius: 8px 8px 0 0;
+    margin: 8px 8px 0 8px;
+    filter: brightness(0.6);
+    transition: filter 0.3s ease;
+    background-color: #333;
+    overflow: hidden;
+}
+
+.game-card-header img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: all 0.5s ease;
+    opacity: 0;
+}
+
+.game-card-header img.loaded {
+    opacity: 1;
+}
+
+.game-card:hover .game-card-header img {
+    transform: scale(1.02);
+}
+
+.game-card:hover .game-card-header {
+    filter: brightness(1);
+}
+
+.game-card-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.8) 100%);
+    border-radius: 5px;
+    z-index: 1;
+}
+
+/* ===== LOADING STATE ===== */
+.game-card-header.loading {
+    background: linear-gradient(90deg, #333 25%, #444 50%, #333 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* ===== PLACEHOLDER SANS IMAGE ===== */
+.game-card-header.no-image::before {
+    content: '🎮';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    opacity: 0.3;
+    z-index: 1;
+}
+
+/* ===== LOGO STEAM ===== */
+.game-logo {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    right: 15px;
+    z-index: 2;
+    max-height: 45px;
+    max-width: 180px;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.9));
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+.game-title-fallback {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    right: 15px;
+    z-index: 2;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    text-align: center;
+}
+
+/* ===== BADGE STEAM ID (debug) ===== */
+.steam-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.7);
+    color: #00ff00;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 3;
+    font-family: monospace;
+}
+
+.game-card-body {
+    padding: 20px;
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.game-progress-container {
+    width: 100%;
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar {
+    background: #1b1b1b;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 15px;
+    border: 1px solid #333;
+}
+
+.progress {
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-dark));
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-text {
+    text-align: center;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ===== ACHIEVEMENTS ===== */
+.achievements-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.achievement-card {
+    background: linear-gradient(135deg, var(--card-bg), #333333);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s ease;
+}
+
+.achievement-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(103, 156, 223, 0.15);
+}
+
+.achievement-card.unlocked {
+    border-color: var(--primary-color);
+}
+
+.achievement-icon {
+    font-size: 2rem;
+    min-width: 50px;
+    text-align: center;
+}
+
+.achievement-info h3 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.achievement-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* ===== SETTINGS AVEC TOGGLE SWITCHES ===== */
+.settings-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.settings-group {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+}
+
+.settings-group h3 {
+    color: var(--primary-color);
+    font-size: 1.7rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ===== TOGGLE SWITCH CLIQUABLE ===== */
+.setting-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    position: relative;
+}
+
+.setting-toggle label {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    flex: 1;
+    user-select: none; /* ✅ Évite la sélection du texte */
+}
+
+/* ✅ CACHE LA CHECKBOX MAIS LA GARDE CLIQUABLE */
+.setting-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 54px;
+    height: 28px;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    z-index: 10; /* ✅ Au-dessus du switch visuel */
+    margin: 0;
+}
+
+/* ✅ SWITCH VISUEL (ne pas mettre pointer-events) */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 54px;
+    height: 28px;
+    background: #ccc;
+    border-radius: 28px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    pointer-events: none; /* ✅ Le switch visuel n'intercepte pas les clics */
+}
+
+.switch::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 24px;
+    height: 24px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    pointer-events: none; /* ✅ Le cercle n'intercepte pas non plus */
+}
+
+/* ✅ ÉTATS DU SWITCH */
+.setting-toggle input[type="checkbox"]:checked + .switch {
+    background: var(--primary-color);
+}
+
+.setting-toggle input[type="checkbox"]:checked + .switch::before {
+    transform: translateX(26px);
+}
+
+/* ✅ HOVER ET FOCUS */
+.setting-toggle input[type="checkbox"]:hover + .switch {
+    box-shadow: 0 0 10px rgba(103, 156, 223, 0.3);
+}
+
+.setting-toggle input[type="checkbox"]:focus + .switch {
+    box-shadow: 0 0 10px rgba(103, 156, 223, 0.5);
+    outline: none;
+}
+
+/* ✅ ANIMATION AU CLIC */
+.setting-toggle input[type="checkbox"]:active + .switch {
+    transform: scale(0.98);
+}
+
+/* Switch Container */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 54px;
+    height: 28px;
+    background: #ccc;
+    border-radius: 28px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+/* Cache la checkbox native */
+.setting-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 54px;
+    height: 28px;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    z-index: 10;
+    margin: 0;
+}
+
+/* État activé du switch */
+.setting-toggle input[type="checkbox"]:checked + .switch {
+    background: var(--primary-color);
+}
+
+.setting-toggle input[type="checkbox"]:checked + .switch::before {
+    transform: translateX(26px);
+}
+
+/* Hover effects */
+.switch:hover {
+    box-shadow: 0 0 10px rgba(103, 156, 223, 0.3);
+}
+
+.setting-toggle input[type="checkbox"]:focus + .switch {
+    box-shadow: 0 0 10px rgba(103, 156, 223, 0.5);
+    outline: none;
+}
+
+/* Liste des dossiers par défaut dans les réglages */
+.default-paths {
+    list-style: none;
+    padding-left: 0;
+    margin: 6px 0 0;
+}
+
+.default-paths li {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.default-paths li + li {
+    margin-top: 4px;
+}
+
+/* Liste des dossiers ajoutés */
+.added-folders-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 6px 0 0;
+}
+
+.added-folders-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.added-folders-list li + li {
+    margin-top: 6px;
+}
+
+.added-folders-list .folder-path {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.added-folders-list .folder-path strong {
+    font-weight: 600;
+}
+
+.added-folders-list .remove-folder {
+    margin-left: auto;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.added-folders-list .remove-folder:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+/* ===== AUTRES INPUTS (texte, nombre, select) ===== */
+.setting-item:not(.setting-toggle) label {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+}
+
+.setting-item input[type="text"],
+.setting-item input[type="number"],
+.setting-item select {
+    padding: 10px 12px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.setting-item input:focus,
+.setting-item select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 10px rgba(103, 156, 223, 0.3);
+}
+
+/* ===== FOLDER INPUT GROUP ===== */
+.folder-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.folder-input-group input {
+    flex: 1;
+}
+
+.browse-btn {
+    padding: 10px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.browse-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+/* ===== CACHE ACTIONS BUTTONS ===== */
+.cache-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.cache-actions button {
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.cache-actions button:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .settings-container {
+        max-width: 100%;
+        padding: 0 10px;
+    }
+
+    .settings-group {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .settings-group h3 {
+        font-size: 1.5rem;
+    }
+
+    .cache-actions {
+        flex-direction: column;
+    }
+
+    .folder-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 480px) {
+    .setting-toggle {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .switch {
+        align-self: flex-end;
+    }
+}
+
+.folder-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.folder-input-group input {
+    flex: 1;
+}
+
+.browse-btn {
+    padding: 10px 15px;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.browse-btn:hover {
+    background: var(--primary-dark);
+}
+
+.cache-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.clear-cache-btn,
+.refresh-cache-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.clear-cache-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.clear-cache-btn:hover {
+    background: #c82333;
+}
+
+.refresh-cache-btn {
+    background: var(--primary-color);
+    color: white;
+}
+
+.refresh-cache-btn:hover {
+    background: var(--primary-dark);
+}
+
+/* ===== SCROLLBAR ===== */
+.menu-content::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.menu-content::-webkit-scrollbar-track,
+.sidebar::-webkit-scrollbar-track {
+    background-color: #2a2a2a;
+}
+
+.menu-content::-webkit-scrollbar-thumb,
+.sidebar::-webkit-scrollbar-thumb {
+    background-color: var(--hover-bg);
+    border-radius: 3px;
+}
+
+.menu-content::-webkit-scrollbar-thumb:hover,
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background-color: #555555;
+}
+
+/* ===== LOADING & ERROR STATES ===== */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+}
+
+.error-message {
+    text-align: center;
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    margin: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.retry-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+    background: var(--primary-dark);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100vw;
+        min-width: 0;
+        left: -100vw;
+    }
+
+    .sidebar-header {
+        padding: 20px 20px 15px 70px;
+    }
+
+    .sidebar-header h2 {
+        font-size: 1.7rem !important;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar-header {
+        padding: 15px 15px 12px 55px;
+    }
+
+    .sidebar-header h2 {
+        font-size: 1.7rem !important;
+        min-width: 0;
+    }
+}
+
+/* ===== Pour les très grands écrans ===== */
+@media (min-width: 1400px) {
+    .sidebar-header h2 {
+        font-size: 1.7rem; /* ✅ Encore plus gros sur grands écrans */
+    }
+}
+
