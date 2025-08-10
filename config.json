@@ -8,16 +8,35 @@
   "achievements": {
     "fallback_beautify": true,
     "show_hidden": true,
-    "sort_by_percentage": true,
+    "sort_by_percentage": false,
     "min_percentage_display": 0.1
   },
   "debug": {
-    "verbose_mode": false,
-    "show_api_calls": false,
-    "log_errors": false
+    "verbose_mode": true,
+    "show_api_calls": true,
+    "log_errors": true
   },
   "paths": {
     "cache_dir": "./cache",
     "output_dir": "./output"
+  },
+  "known_locations": {
+    "public_docs": {
+      "base_path": "C:/Users/Public/Documents/Steam",
+      "teams": ["CODEX", "RUNE"]
+    },
+    "appdata_roaming": {
+      "base_path": "~/AppData/Roaming",
+      "teams": ["EMPRESS", "SmartSteamEmu", "Goldberg SteamEmu Saves", "CreamAPI"]
+    },
+    "appdata_local": {
+      "base_path": "~/AppData/Local",
+      "teams": ["SKIDROW"]
+    },
+    "steam_appdata": {
+      "base_path": "~/AppData/Roaming/Steam",
+      "teams": ["CODEX"]
+    }
   }
 }
+
