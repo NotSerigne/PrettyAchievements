@@ -1,6 +1,6 @@
 {
   "steam_api": {
-    "api_key": "572E8E18D4E4D7D7221C179BC4141FB1",
+    "api_key": "",
     "default_language": "fr",
     "max_retries": 3,
     "timeout": 10
