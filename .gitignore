@@ -1,1 +1,10 @@
-/node_modules
+# Node
+node_modules/
+electron-app/node_modules/
+
+# Builds Electron
+**/dist/
+**/out/
+
+# JetBrains
+.idea/
