@@ -299,3 +299,5 @@ ipcMain.handle('config/load', async () => {
         return {};
     }
 });
+
+print("Hello World!")

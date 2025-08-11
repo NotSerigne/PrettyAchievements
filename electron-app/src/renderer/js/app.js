@@ -1418,3 +1418,5 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('❌ Erreur initialisation:', error);
     }
 });
+
+print("Hello World!")
