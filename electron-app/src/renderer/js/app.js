@@ -10,10 +10,11 @@ class PrettyAchievementsUI {
         this.initializeDemoData();
         this.ensureRescanButton();
         this.ensureSortButton();
-        this.ensureToastContainer();
         this.sortMode = this.loadSortMode(); // 'completion-desc' | 'completion-asc' | 'alpha-asc' | 'alpha-desc'
         this.bindEvents(); // ✅ Doit inclure les events burger
         this.bindSteamEvents();
+        // Initialise les boutons de position de notification
+        this.initNotifyPositionGrid();
         this.loadDashboard();
         this.ensureAchievementCountStyles();
         this.scanOnStartup();
@@ -1262,19 +1263,16 @@ class PrettyAchievementsUI {
                 setFeedback('Notification affichée.');
             }
             const position = this.getSavedNotifyPosition();
-            // Overlay OS-level style (outside app window)
+            // Use centralized notifications module
             try {
-                await window.electronAPI?.invoke?.('notify/custom', {
+                await window.PANotifications?.show({
                     title: 'Pretty Achievements',
                     message: 'Ceci est une notification de test 🎉',
                     type: 'info',
                     duration: 4000,
                     position
                 });
-            } catch (_) {
-                // Fallback to in-app toast if IPC fails
-                this.showCustomNotification({ title: 'Pretty Achievements', message: 'Ceci est une notification de test 🎉', type: 'info', duration: 4000 });
-            }
+            } catch (_) { /* ignore OS-level errors */ }
         } catch (e) {
             setFeedback('Erreur lors de l’affichage de la notification.', false);
             try { console.warn('Test notification failed:', e); } catch (_) {}
@@ -1308,39 +1306,9 @@ class PrettyAchievementsUI {
     }
 
     // ===== TOAST CUSTOM NOTIFICATIONS =====
-    ensureToastContainer() {
-        try {
-            if (document.getElementById('paToastContainer')) return;
-            const c = document.createElement('div');
-            c.id = 'paToastContainer';
-            c.className = 'pa-toast-container';
-            document.body.appendChild(c);
-        } catch (_) { /* ignore */ }
-    }
+    // removed: in-app toast container
 
-    showCustomNotification({ title = 'Notification', message = '', type = 'info', duration = 4000 } = {}) {
-        try {
-            this.ensureToastContainer();
-            const container = document.getElementById('paToastContainer');
-            if (!container) return;
-            const toast = document.createElement('div');
-            toast.className = `pa-toast pa-${type}`;
-            container.appendChild(toast);
-            // Close logic
-            const close = () => {
-                if (!toast._closing) {
-                    toast._closing = true;
-                    toast.classList.add('pa-hide');
-                    setTimeout(() => {
-                        try { toast.remove(); } catch (_) {}
-                    }, 220);
-                }
-            };
-            toast.querySelector('.pa-toast-close')?.addEventListener('click', close);
-            // Auto close
-            if (duration > 0) setTimeout(close, duration);
-        } catch (_) { /* ignore */ }
-    }
+    // removed: in-app toast function
 
     // ===== NOTIFY POSITION HELPERS =====
     initNotifyPositionGrid() {
@@ -1367,6 +1335,7 @@ class PrettyAchievementsUI {
                 btn.classList.add('active');
                 const pos = btn.getAttribute('data-position') || 'bottom-right';
                 this.setSavedNotifyPosition(pos);
+                this.applyToastContainerPosition(pos);
             });
         } catch (_) { /* ignore */ }
     }
@@ -1375,6 +1344,28 @@ class PrettyAchievementsUI {
     }
     setSavedNotifyPosition(pos) {
         try { localStorage.setItem('notifyPosition', String(pos || 'bottom-right')); } catch (_) {}
+    }
+
+    applyToastContainerPosition(pos) {
+        try {
+            const c = document.getElementById('paToastContainer');
+            if (!c) return;
+            const classes = [
+                'pa-pos-top-left', 'pa-pos-top-center', 'pa-pos-top-right',
+                'pa-pos-bottom-left', 'pa-pos-bottom-center', 'pa-pos-bottom-right'
+            ];
+            c.classList.remove(...classes);
+            const map = {
+                'top-left': 'pa-pos-top-left',
+                'top-center': 'pa-pos-top-center',
+                'top-right': 'pa-pos-top-right',
+                'bottom-left': 'pa-pos-bottom-left',
+                'bottom-center': 'pa-pos-bottom-center',
+                'bottom-right': 'pa-pos-bottom-right'
+            };
+            const cls = map[pos] || 'pa-pos-bottom-right';
+            c.classList.add(cls);
+        } catch (_) { /* ignore */ }
     }
 
     renderNoGamesEmptyState() {

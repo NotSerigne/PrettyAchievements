@@ -1313,39 +1313,7 @@ body {
     pointer-events: none;
 }
 
-/* ===== TOAST NOTIFICATIONS ===== */
-.pa-toast-container {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    z-index: 2000;
-}
-.pa-toast {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 260px;
-    max-width: 360px;
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: #222;
-    border: 1px solid #444;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
-    color: var(--text-primary);
-    animation: pa-toast-in .2s ease-out;
-}
-.pa-toast.pa-info { border-color: #4a78c2; }
-.pa-toast.pa-success { border-color: #28a745; }
-.pa-toast.pa-error { border-color: #dc3545; }
-.pa-toast-content { flex: 1 1 auto; }
-.pa-toast-title { font-weight: 700; margin-bottom: 2px; }
-.pa-toast-message { color: var(--text-secondary); font-size: 0.95rem; }
-.pa-toast-close { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; }
-.pa-hide { opacity: 0; transform: translateY(6px); transition: all .2s ease-in; }
-@keyframes pa-toast-in { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+/* in-app toast system removed; moved to renderer/notifications and main overlay */
 
 /* ===== GLOBAL: Hide all scrollbars while keeping scroll functionality ===== */
 /* Chrome, Safari, Opera (WebKit/Blink) */

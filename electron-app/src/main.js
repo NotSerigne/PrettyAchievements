@@ -182,34 +182,36 @@ ipcMain.handle('games/detect-cracked', async () => {
 
 // ===== Custom overlay notification (outside app window) =====
 let __paToasts = [];
-function showOverlayNotification({ title = 'Notification', message = '', type = 'info', duration = 4000, position = 'bottom-right' } = {}) {
+function showOverlayNotification({ title = 'Notification', message = '', type = 'info', duration = 4000, position = 'bottom-right', achievementName = '', achievementDescription = '', communityPercent = null } = {}) {
     try {
-        // Positionner sur l'écran où se trouve le curseur pour garantir la visibilité
-        const point = screen.getCursorScreenPoint();
-        const display = screen.getDisplayNearestPoint(point);
+        // Afficher sur l'écran principal (primary)
+        const display = screen.getPrimaryDisplay();
         const work = display.workArea; // { x, y, width, height }
         const displayId = display.id ?? `${work.x}:${work.y}:${work.width}:${work.height}`;
-        const width = 360;
-        const height = 100;
+        const width = 420;
+        const height = 110;
         const margin = 16;
         const stackCount = __paToasts.filter(t => t && t.displayId === displayId && t.position === position).length;
         const totalOffset = stackCount * (height + 10);
-        let x = work.x + work.width - width - margin; // default right
-        let y = work.y + work.height - height - margin - totalOffset; // default bottom
+        let targetX = work.x + work.width - width - margin; // default right
+        let targetY = work.y + work.height - height - margin - totalOffset; // default bottom
         const [vert, horiz] = (() => {
             const p = String(position || '').toLowerCase();
             if (p.includes('top')) return ['top', p.includes('left') ? 'left' : p.includes('center') ? 'center' : 'right'];
             return ['bottom', p.includes('left') ? 'left' : p.includes('center') ? 'center' : 'right'];
         })();
-        if (horiz === 'left') x = work.x + margin;
-        if (horiz === 'center') x = Math.round(work.x + (work.width - width) / 2);
-        if (vert === 'top') y = work.y + margin + totalOffset;
+        if (horiz === 'left') targetX = work.x + margin;
+        if (horiz === 'center') targetX = Math.round(work.x + (work.width - width) / 2);
+        if (vert === 'top') targetY = work.y + margin + totalOffset;
+
+        // Determine entrance direction for CSS animation inside the window
+        const enterDir = (horiz === 'left') ? 'left' : (horiz === 'right') ? 'right' : (vert === 'top' ? 'top' : 'bottom');
 
         const win = new BrowserWindow({
             width,
             height,
-            x,
-            y,
+            x: targetX,
+            y: targetY,
             frame: false,
             transparent: true,
             resizable: false,
@@ -223,7 +225,8 @@ function showOverlayNotification({ title = 'Notification', message = '', type = 
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
-                sandbox: true
+                sandbox: true,
+                backgroundThrottling: false
             }
         });
         win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -233,23 +236,50 @@ function showOverlayNotification({ title = 'Notification', message = '', type = 
         const border = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#4a78c2';
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
         <style>
-        html,body{margin:0;padding:0;background:transparent;}
-        .toast{display:flex;gap:10px;align-items:center;box-sizing:border-box;width:100%;height:100%;padding:12px 14px;border-radius:10px;background:rgba(20,20,20,0.9);border:1px solid ${border};color:#fff;font-family:Segoe UI,Tahoma,sans-serif;box-shadow:0 10px 24px rgba(0,0,0,0.35);}
-        .content{flex:1 1 auto;}
-        .title{font-weight:700;margin-bottom:2px}
-        .msg{opacity:.85;font-size:14px}
-        .close{background:transparent;border:0;color:#ccc;cursor:pointer;font-size:14px}
-        .enter{animation:enter .2s ease-out}
-        @keyframes enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        </style></head><body>
-        <div class="toast enter">
-            <div class="content">
-                <div class="title">${esc(title)}</div>
-                <div class="msg">${esc(message)}</div>
+        html,body{margin:0;padding:0;background:transparent;font-family:Segoe UI,Tahoma,sans-serif}
+        .outer{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+        .track{display:flex;align-items:center;gap:10px}
+        .core{width:84px;height:84px;border-radius:12px;background:rgba(20,20,20,0.9);border:1px solid ${border};box-shadow:0 10px 24px rgba(0,0,0,0.35);transition:transform .28s ease;will-change:transform}
+        .detail{height:84px;width:0;overflow:hidden;border-radius:10px;border:1px solid #4a78c2;background:linear-gradient(135deg,#3a4a6a,#679CDF);display:flex;align-items:center;gap:12px;padding:12px 14px;box-shadow:0 10px 24px rgba(0,0,0,0.35);color:#fff;transition:width .34s cubic-bezier(.22,1,.36,1);will-change:width}
+        .text{flex:1 1 auto;min-width:0}
+        .title{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+        .msg{opacity:.95;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .pct{margin-left:12px;font-weight:800;font-size:18px;white-space:nowrap}
+        /* Stage 2 reveal */
+        .reveal .core{transform:translateX(-10px)}
+        .reveal .detail{width:280px}
+        /* Directional entrance for the whole layout */
+        @keyframes enter-left{from{opacity:0;transform:translateX(-120%)}to{opacity:1;transform:translateX(0)}}
+        @keyframes enter-right{from{opacity:0;transform:translateX(120%)} to{opacity:1;transform:translateX(0)}}
+        @keyframes enter-top{from{opacity:0;transform:translateY(-120%)} to{opacity:1;transform:translateY(0)}}
+        @keyframes enter-bottom{from{opacity:0;transform:translateY(120%)} to{opacity:1;transform:translateY(0)}}
+        .enter-left .outer{animation:enter-left .3s cubic-bezier(.22,1,.36,1)}
+        .enter-right .outer{animation:enter-right .3s cubic-bezier(.22,1,.36,1)}
+        .enter-top .outer{animation:enter-top .3s cubic-bezier(.22,1,.36,1)}
+        .enter-bottom .outer{animation:enter-bottom .3s cubic-bezier(.22,1,.36,1)}
+        .leave .outer{opacity:0;transform:translateY(6px);transition:all .18s ease-in}
+        </style></head><body class="enter-${enterDir}">
+        <div class="outer">
+          <div class="track">
+            <div class="core"></div>
+            <div class="detail">
+              <div class="text">
+                <div class="title">${esc(achievementName || title)}</div>
+                <div class="msg">${esc(achievementDescription || message)}</div>
+              </div>
+              <div class="pct">${communityPercent != null ? esc(String(communityPercent)) + '%' : ''}</div>
             </div>
-            <button class="close" onclick="window.close()" aria-label="Fermer">✖</button>
+          </div>
         </div>
-        <script>setTimeout(()=>window.close(), ${Math.max(0, Number(duration)||0)});</script>
+        <script>(function(){
+          try{
+            setTimeout(function(){ document.body.classList.add('reveal'); }, 140);
+            var ttl=${Math.max(0, Number(duration)||0)};
+            if(ttl>0) setTimeout(function(){
+              try{ document.body.classList.add('leave'); setTimeout(function(){ window.close() }, 180); }catch(e){ window.close(); }
+            }, ttl);
+          }catch(e){}
+        })();</script>
         </body></html>`;
         win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).catch(() =>{});
         win.once('ready-to-show', () => {
