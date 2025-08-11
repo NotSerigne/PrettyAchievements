@@ -466,7 +466,7 @@ body {
     overflow: hidden;
 }
 
-.game-card-header img {
+.game-card-header > img:not(.game-logo) {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -475,10 +475,12 @@ body {
     top: 0;
     left: 0;
     transition: all 0.5s ease;
-    opacity: 0;
+    opacity: 100%;
 }
 
 .game-card-header img.loaded {
+    width: 100%;
+    height: 100%;
     opacity: 1;
 }
 
@@ -531,10 +533,11 @@ body {
     position: absolute;
     bottom: 15px;
     left: 15px;
-    right: 15px;
+    right: auto;
+    transform: none;
     z-index: 2;
-    max-height: 45px;
-    max-width: 180px;
+    max-height: 100px;
+    max-width: 75%;
     object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.9));
     image-rendering: -webkit-optimize-contrast;
@@ -551,7 +554,7 @@ body {
     font-weight: bold;
     font-size: 1.2rem;
     text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-    text-align: center;
+    text-align: left;
 }
 
 /* ===== BADGE STEAM ID (debug) ===== */
@@ -1152,3 +1155,140 @@ body {
     }
 }
 
+/* ===== Sidebar games cards overrides ===== */
+.sidebar-games-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.sidebar-games-grid .game-card {
+    height: auto;
+}
+
+.sidebar-games-grid .game-card-header {
+    border-radius: 0;
+    height: 75px;
+    margin: 2px 2px 0 2px;
+}
+
+/* Image s'adapte au header (cover) */
+.sidebar-games-grid .game-card-header > img:not(.game-logo) {
+    clip-path: none;
+    object-position: center;
+}
+
+/* Logo plus petit dans la sidebar */
+.sidebar-games-grid .game-logo {
+    max-height: 24px;
+    max-width: 40%;
+    left: 12px;
+    bottom: 8px;
+}
+/* Titre fallback plus compact dans la sidebar */
+.sidebar-games-grid .game-title-fallback {
+    font-size: 0.9rem;
+}
+
+/* Corps en ligne: info à gauche, progression à droite */
+.sidebar-games-grid .game-card-body {
+    padding: 4px 6px;
+    height: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+}
+
+.sidebar-games-grid .game-name {
+    flex: 1 1 auto;
+    font-size: 0.85rem;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Conteneur de progression réduit, à droite */
+.sidebar-games-grid .game-progress-container {
+    width: 70px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.sidebar-games-grid .progress-bar {
+    height: 10px;
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.sidebar-games-grid .progress-text {
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+/* ===== RESCAN ICON (top-right) ===== */
+.rescan-menu {
+    position: fixed;
+    top: 20px; /* same as burger-menu */
+    right: 20px;
+    z-index: 1002;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(103, 156, 223, 0.3);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+}
+.rescan-menu:hover {
+    background: var(--primary-dark);
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(103, 156, 223, 0.4);
+}
+.rescan-menu:active {
+    transform: scale(0.95);
+}
+
+/* Better centering for empty state inside games grid */
+#gamesGrid .no-results {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    min-height: 220px;
+}
+
+/* ===== GLOBAL: Hide all scrollbars while keeping scroll functionality ===== */
+/* Chrome, Safari, Opera (WebKit/Blink) */
+*::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+}
+*::-webkit-scrollbar-thumb {
+    background: transparent !important;
+}
+*::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+/* Firefox */
+* {
+    scrollbar-width: none !important;
+}
+/* IE and old Edge */
+* {
+    -ms-overflow-style: none !important;
+}

@@ -1,19 +1,36 @@
 class PrettyAchievementsUI {
     constructor() {
         this.sidebarOpen = false; // ✅ Track sidebar state
+        this.isScanning = false;
+        this.scanSeq = 0;
+        this.rescanRequested = false;
+        this.lastDetectedCrackedGames = null; // cache dernier résultat non vide
 
         this.initializeElements();
         this.initializeDemoData();
+        this.ensureRescanButton();
         this.bindEvents(); // ✅ Doit inclure les events burger
         this.bindSteamEvents();
         this.loadDashboard();
+        this.ensureAchievementCountStyles();
+        this.scanOnStartup();
+        this.loadConfigOnStartup();
 
         // Écoute des jeux détectés depuis le main process
         if (window.electronAPI?.on) {
             window.electronAPI.on('games/detected', (data) => {
                 try {
-                    this.detectedCrackedGames = data || {};
+                    const incoming = (data && typeof data === 'object') ? data : {};
+                    const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
+                    const prevCount = Object.keys(prev).length;
+                    const newCount = Object.keys(incoming).length;
+                    // Ne pas écraser les jeux déjà détectés par un résultat vide
+                    if (newCount > 0 || prevCount === 0) {
+                        this.detectedCrackedGames = incoming;
+                        if (newCount > 0) this.lastDetectedCrackedGames = incoming;
+                    }
                     this.renderDetectedCrackedGames();
+                    this.renderSidebarGames();
                 } catch (e) { console.warn('render cracked games failed:', e); }
             });
         }
@@ -23,8 +40,14 @@ class PrettyAchievementsUI {
             if (!this.detectedCrackedGames && window.electronAPI?.invoke) {
                 try {
                     const data = await window.electronAPI.invoke('games/detect-cracked');
-                    this.detectedCrackedGames = data || {};
+                    const incoming = (data && typeof data === 'object') ? data : {};
+                    const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
+                    if (Object.keys(incoming).length > 0 || Object.keys(prev).length === 0) {
+                        this.detectedCrackedGames = incoming;
+                        if (Object.keys(incoming).length > 0) this.lastDetectedCrackedGames = incoming;
+                    }
                     this.renderDetectedCrackedGames();
+                    this.renderSidebarGames();
                 } catch (e) { /* ignore */ }
             }
         }, 3000);
@@ -42,6 +65,11 @@ class PrettyAchievementsUI {
         this.searchBar = document.getElementById('searchBar');
         this.menuItems = document.querySelectorAll('.menu-item');
         this.contentSections = document.querySelectorAll('.content-section');
+
+        // Eléments section jeux
+        this.gamesLoadingEl = document.getElementById('gamesLoading');
+        // Élément liste jeux sidebar
+        this.sidebarListEl = document.querySelector('.scrollable-content');
 
         // ✅ Vérification des éléments critiques
         if (!this.burgerMenu) console.error('❌ burgerMenu not found');
@@ -99,8 +127,18 @@ class PrettyAchievementsUI {
             });
         }
 
+        // ✅ BOUTON RESCAN (top-right)
+        this.rescanBtn = document.getElementById('rescanMenuBtn');
+        if (this.rescanBtn) {
+            this.rescanBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.scanAndLoadGames();
+            });
+        }
+
         // ✅ EVENTS SETTINGS
         this.bindSettingsEvents();
+        this.bindSaveSettings();
     }
 
     // ✅ GESTION SIDEBAR
@@ -168,10 +206,19 @@ class PrettyAchievementsUI {
             targetMenuItem.classList.add('active');
         }
 
+        // Masquer le bouton rescan par défaut
+        const rescan = document.getElementById('rescanMenuBtn');
+        if (rescan) rescan.style.display = 'none';
+
         // Charger le contenu selon la section
         switch(sectionId) {
             case 'games':
-                this.loadGames().then(() =>{} );
+                this.loadGames();
+                // If a scan is already running (e.g., startup), mirror the loader into the games page without triggering a scan
+                if (this.isScanning) {
+                    this.ensureGamesLoaderVisible();
+                }
+                if (rescan) rescan.style.display = 'flex';
                 break;
             case 'achievements':
                 this.loadAchievements();
@@ -194,9 +241,9 @@ class PrettyAchievementsUI {
             return;
         }
 
-        // Filtrer sur l'ensemble des jeux (détectés + démo)
-        const allGames = this.getAllGames();
-        const filteredGames = allGames.filter(game =>
+        // Filtrer uniquement sur les jeux détectés
+        const detectedGames = this.getDetectedGames();
+        const filteredGames = detectedGames.filter(game =>
             (game.name || '').toLowerCase().includes(query.toLowerCase())
         );
 
@@ -233,6 +280,7 @@ class PrettyAchievementsUI {
     renderDetectedCrackedGames() {
         // Rafraîchir la grille des jeux si la section est visible
         const gamesSection = document.getElementById('games');
+        this.renderSidebarGames();
         if (!gamesSection) return;
         const isActive = gamesSection.classList.contains('active');
         if (isActive) {
@@ -242,6 +290,261 @@ class PrettyAchievementsUI {
 
     // ===== VOS MÉTHODES EXISTANTES (inchangées) =====
     bindSteamEvents() { /* ... votre code Steam ... */ }
+    async scanAndLoadGames() {
+        if (this.isScanning) {
+            this.rescanRequested = true;
+            return;
+        }
+        this.isScanning = true;
+        const localScanId = ++this.scanSeq;
+
+        const gamesGrid = document.getElementById('gamesGrid');
+        const prevCount = this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object' ? Object.keys(this.detectedCrackedGames).length : 0;
+        if (prevCount === 0 && gamesGrid) gamesGrid.innerHTML = '';
+        this.showGamesLoading();
+        try {
+            let data = null;
+            if (window.electronAPI?.invoke) {
+                data = await window.electronAPI.invoke('games/detect-cracked').catch(() => null);
+                let count = data && typeof data === 'object' ? Object.keys(data).length : 0;
+                if (count === 0) {
+                    await this.sleep(800);
+                    const retry = await window.electronAPI.invoke('games/detect-cracked').catch(() => null);
+                    if (retry) {
+                        data = retry;
+                        count = data && typeof data === 'object' ? Object.keys(data).length : 0;
+                    }
+                }
+            }
+
+            if (localScanId !== this.scanSeq) {
+                // Un autre scan a été lancé entre-temps, ignorer ce résultat
+                return;
+            }
+
+            const prevCount = this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object' ? Object.keys(this.detectedCrackedGames).length : 0;
+            const newCount = data && typeof data === 'object' ? Object.keys(data).length : 0;
+            if (newCount > 0 || prevCount === 0) {
+                // Remplacer uniquement si on a de nouvelles données, ou si on n'avait rien avant
+                this.detectedCrackedGames = data || {};
+                if (newCount > 0) this.lastDetectedCrackedGames = this.detectedCrackedGames;
+            }
+            if (newCount === 0 && prevCount === 0 && (!this.lastDetectedCrackedGames || Object.keys(this.lastDetectedCrackedGames).length === 0)) {
+                this.renderNoGamesEmptyState();
+            } else {
+                await this.loadGames();
+            }
+            this.renderSidebarGames();
+        } catch (e) {
+            console.warn('games detection failed:', e);
+        } finally {
+            this.hideGamesLoading(true);
+            this.isScanning = false;
+            if (this.rescanRequested) {
+                this.rescanRequested = false;
+                // Relance immédiatement un nouveau scan demandé pendant l'exécution
+                this.scanAndLoadGames();
+            }
+        }
+    }
+    showGamesLoading() {
+        let el = this.gamesLoadingEl || document.getElementById('gamesLoading');
+        if (!el) {
+            const gamesSection = document.getElementById('games');
+            if (gamesSection) {
+                el = document.createElement('div');
+                el.id = 'gamesLoading';
+                el.className = 'games-loading';
+                this.gamesLoadingEl = el;
+            }
+        }
+        if (el) {
+            // Positionner explicitement le loader juste après le H1 de la section Jeux
+            const gamesSection = document.getElementById('games');
+            if (gamesSection) {
+                const h1 = gamesSection.querySelector('h1');
+                if (h1) {
+                    if (el.parentNode !== gamesSection || el.previousElementSibling !== h1) {
+                        gamesSection.insertBefore(el, h1.nextSibling);
+                    }
+                } else if (!el.parentNode) {
+                    gamesSection.insertBefore(el, gamesSection.firstChild);
+                }
+            }
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.flexDirection = 'column';
+            el.style.padding = '10px 0';
+            el.style.rowGap = '6px';
+            el.innerHTML = `
+                <div class="loading-spinner">⚡</div>
+                <p>Scan des jeux...</p>
+                <div id="gamesProgressBar" style="width:80%;max-width:420px;height:8px;border-radius:4px;background:#1b1b1b;border:1px solid #333;overflow:hidden;margin-top:6px;">
+                  <div id="gamesProgressBarInner" style="height:100%;width:0%;background:linear-gradient(90deg, #679CDF, #5489CC);transition:width 0.3s ease;"></div>
+                </div>
+            `;
+        }
+        // Loader synchronisé dans la sidebar
+        this.showSidebarLoading();
+
+        if (this._progressTimer) clearInterval(this._progressTimer);
+        let progress = 0;
+        this._progressTimer = setInterval(() => {
+            progress += Math.random() * 10 + 5;
+            if (progress > 90) progress = 90;
+            const barMain = document.getElementById('gamesProgressBarInner');
+            if (barMain) barMain.style.width = progress + '%';
+            const barSide = document.getElementById('sidebarProgressBarInner');
+            if (barSide) barSide.style.width = progress + '%';
+        }, 300);
+    }
+    ensureGamesLoaderVisible() {
+        try {
+            const gamesSection = document.getElementById('games');
+            if (!gamesSection || !gamesSection.classList.contains('active')) return;
+            let el = this.gamesLoadingEl || document.getElementById('gamesLoading');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'gamesLoading';
+                el.className = 'games-loading';
+                this.gamesLoadingEl = el;
+            }
+            const h1 = gamesSection.querySelector('h1');
+            if (h1) {
+                if (el.parentNode !== gamesSection || el.previousElementSibling !== h1) {
+                    gamesSection.insertBefore(el, h1.nextSibling);
+                }
+            } else if (!el.parentNode) {
+                gamesSection.insertBefore(el, gamesSection.firstChild);
+            }
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.flexDirection = 'column';
+            el.style.padding = '10px 0';
+            el.style.rowGap = '6px';
+            el.innerHTML = `
+                <div class="loading-spinner">⚡</div>
+                <p>Scan des jeux...</p>
+                <div id="gamesProgressBar" style="width:80%;max-width:420px;height:8px;border-radius:4px;background:#1b1b1b;border:1px solid #333;overflow:hidden;margin-top:6px;">
+                  <div id="gamesProgressBarInner" style="height:100%;width:0%;background:linear-gradient(90deg, #679CDF, #5489CC);transition:width 0.3s ease;"></div>
+                </div>
+            `;
+        } catch (_) { /* ignore */ }
+    }
+    hideGamesLoading(done = false) {
+        const el = this.gamesLoadingEl || document.getElementById('gamesLoading');
+        if (this._progressTimer) {
+            clearInterval(this._progressTimer);
+            this._progressTimer = null;
+        }
+        const barMain = document.getElementById('gamesProgressBarInner');
+        if (barMain && done) barMain.style.width = '100%';
+        const barSide = document.getElementById('sidebarProgressBarInner');
+        if (barSide && done) barSide.style.width = '100%';
+        setTimeout(() => {
+            if (el) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+            }
+            this.hideSidebarLoading(done);
+        }, done ? 200 : 0);
+    }
+    showSidebarLoading() {
+        const container = this.sidebarListEl || document.querySelector('.scrollable-content');
+        if (!container) return;
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        container.innerHTML = `
+            <div class="loading-spinner">⚡</div>
+            <p>Scan des jeux...</p>
+            <div id="sidebarProgressBar" style="width:90%;max-width:320px;height:8px;border-radius:4px;background:#1b1b1b;border:1px solid #333;overflow:hidden;margin-top:10px;">
+                <div id="sidebarProgressBarInner" style="height:100%;width:0%;background:linear-gradient(90deg, #679CDF, #5489CC);transition:width 0.3s ease;"></div>
+            </div>
+        `;
+        // Mirror loader in games page if open, without triggering a scan
+        this.ensureGamesLoaderVisible();
+    }
+    hideSidebarLoading(done = false) {
+        const container = this.sidebarListEl || document.querySelector('.scrollable-content');
+        if (!container) return;
+        setTimeout(() => {
+            container.style.display = '';
+            // Also finalize and hide the loader in the games page if present
+            const barMain = document.getElementById('gamesProgressBarInner');
+            if (barMain && done) barMain.style.width = '100%';
+            const gamesEl = this.gamesLoadingEl || document.getElementById('gamesLoading');
+            if (gamesEl) {
+                gamesEl.style.display = 'none';
+                gamesEl.innerHTML = '';
+            }
+        }, done ? 150 : 0);
+    }
+    renderSidebarGames() {
+        const container = this.sidebarListEl || document.querySelector('.scrollable-content');
+        if (!container) return;
+        const games = this.getDetectedGames();
+        if (!games || games.length === 0) {
+            container.innerHTML = '<div class="sidebar-note" style="color:var(--text-secondary);font-size:0.9rem;padding:8px 4px;text-align:center;">Aucun jeu détecté pour le moment.</div>';
+            return;
+        }
+        const cards = games.map(game => {
+            const achievements = Number(game.achievements || 0);
+            const unlocked = Number(game.unlocked || 0);
+            const progress = achievements > 0 ? Math.round((unlocked / achievements) * 100) : 0;
+            return `<div class="game-card">${this.createGameCardHTML(game, progress, null)}</div>`;
+        }).join('');
+        container.innerHTML = `<div class="games-grid sidebar-games-grid">${cards}</div>`;
+        if (!container._sgClickBound) {
+            container.addEventListener('click', (e) => {
+                const card = e.target.closest?.('.game-card');
+                if (!card) return;
+                // Ouvrir la page Jeux sans relancer un scan
+                this.skipNextGamesScan = true;
+                this.showSection('games');
+            });
+            container._sgClickBound = true;
+        }
+    }
+    async scanOnStartup() {
+        try {
+            if (!window.electronAPI?.invoke) return;
+            if (this.isScanning) return;
+            this.isScanning = true;
+            this.showSidebarLoading();
+            if (this._progressTimer) clearInterval(this._progressTimer);
+            let progress = 0;
+            this._progressTimer = setInterval(() => {
+                progress += Math.random() * 10 + 5;
+                if (progress > 90) progress = 90;
+                const barSide = document.getElementById('sidebarProgressBarInner');
+                if (barSide) barSide.style.width = progress + '%';
+                const barMain = document.getElementById('gamesProgressBarInner');
+                if (barMain) barMain.style.width = progress + '%';
+            }, 300);
+
+            const data = await window.electronAPI.invoke('games/detect-cracked');
+            const incoming = (data && typeof data === 'object') ? data : {};
+            const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
+            if (Object.keys(incoming).length > 0 || Object.keys(prev).length === 0) {
+                this.detectedCrackedGames = incoming;
+                if (Object.keys(incoming).length > 0) this.lastDetectedCrackedGames = incoming;
+            }
+            this.renderSidebarGames();
+        } catch (e) {
+            console.warn('startup scan failed:', e);
+        } finally {
+            this.hideSidebarLoading(true);
+            if (this._progressTimer) {
+                clearInterval(this._progressTimer);
+                this._progressTimer = null;
+            }
+            this.isScanning = false;
+        }
+    }
     async loadGames() {
         const gamesGrid = document.getElementById('gamesGrid');
         if (!gamesGrid) return;
@@ -249,15 +552,14 @@ class PrettyAchievementsUI {
         gamesGrid.innerHTML = '';
 
         const detected = this.getDetectedGames();
-        const demo = Array.isArray(this.demoData?.games) ? this.demoData.games : [];
 
-        const toRender = detected.length ? detected : demo;
+        const toRender = detected;
 
         if (toRender.length === 0) {
             gamesGrid.innerHTML = `
-                <div class="no-results">
-                    <h3>Aucun jeu détecté</h3>
-                    <p>Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
+                <div class="no-results" style="display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;min-height:200px;gap:6px;grid-column:1 / -1;justify-self:center;width:100%;">
+                    <h3 style="margin:0;">Aucun jeu détecté</h3>
+                    <p style="margin:0;color:var(--text-secondary);">Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
                 </div>
             `;
             return;
@@ -280,11 +582,17 @@ class PrettyAchievementsUI {
         const quality = document.getElementById('steamImageQuality')?.value || 'medium';
         let headerUrl = '';
         let logoUrl = '';
+        const logoCandidate = appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/logo.png` : '';
 
         if (enableImages && appId) {
+            // Afficher le logo uniquement si le mode n'est pas "Header"
+            if (quality !== 'medium') {
+                logoUrl = logoCandidate;
+            } else {
+                logoUrl = '';
+            }
             if (quality === 'high') {
                 headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_hero.jpg`;
-                logoUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/logo.png`;
             } else if (quality === 'low') {
                 headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_616x353.jpg`;
             } else {
@@ -292,14 +600,25 @@ class PrettyAchievementsUI {
             }
         }
 
+        // Debug: print logo URL for each game
+        if (logoCandidate) {
+            try { console.log(`[DEBUG] Logo URL for ${name} [${appId}]: ${logoCandidate}`); } catch (_) {}
+        }
+
+        const achievements = Number(game.achievements || 0);
+        const unlocked = Number(game.unlocked || 0);
+        const countHtml = `<div class="achievement-count">${unlocked}/${achievements}</div>`;
+
         return `
           <div class="game-card-header ${headerUrl ? '' : 'no-image'}">
             ${headerUrl ? `<img src="${headerUrl}" alt="${this.escapeHtml(name)}" onload="this.classList.add('loaded')" referrerpolicy="no-referrer">` : ''}
-            ${logoUrl ? `<img class=\"game-logo\" src=\"${logoUrl}\" alt=\"${this.escapeHtml(name)}\" referrerpolicy=\"no-referrer\">` : `<div class=\"game-title-fallback\">${this.escapeHtml(name)}</div>`}
-            ${appId ? `<div class=\"steam-badge\">AppID: ${appId}</div>` : ''}
+            ${logoUrl ? `<img class=\"game-logo\" src=\"${logoUrl}\" alt=\"${this.escapeHtml(name)}\" referrerpolicy=\"no-referrer\" onerror=\"this.remove()\" onload=\"var f=this.nextElementSibling; if(f&&f.classList.contains('game-title-fallback')) f.style.display='none';\">` : ''}
+            <div class=\"game-title-fallback\">${this.escapeHtml(name)}</div>
           </div>
           <div class="game-card-body">
+            <div class="game-name">${this.escapeHtml(name)}</div>
             <div class="game-progress-container">
+              ${countHtml}
               <div class="progress-bar"><div class="progress" style="width:${progress}%"></div></div>
               <div class="progress-text">${progress}% complété</div>
             </div>
@@ -311,14 +630,30 @@ class PrettyAchievementsUI {
     loadStatistics() { /* ... votre code stats ... */ }
     getDetectedGames() {
         try {
-            const dict = this.detectedCrackedGames || {};
-            return Object.keys(dict).map(k => ({
-                id: Number(k),
-                steamAppId: Number(k),
-                name: String(dict[k] || `App ${k}`),
-                achievements: 0,
-                unlocked: 0
-            }));
+            const base = this.detectedCrackedGames || {};
+            const dict = (Object.keys(base).length === 0 && this.lastDetectedCrackedGames && Object.keys(this.lastDetectedCrackedGames).length > 0)
+                ? this.lastDetectedCrackedGames
+                : base;
+            return Object.keys(dict).map(k => {
+                const raw = dict[k];
+                let name = `App ${k}`;
+                let achievements = 0;
+                let unlocked = 0;
+                if (typeof raw === 'string') {
+                    name = raw;
+                } else if (raw && typeof raw === 'object') {
+                    name = String(raw.name || raw.title || `App ${k}`);
+                    achievements = Number(raw.achievements || raw.totalAchievements || 0);
+                    unlocked = Number(raw.unlocked || raw.unlockedAchievements || raw.achievementsUnlocked || 0);
+                }
+                return {
+                    id: Number(k),
+                    steamAppId: Number(k),
+                    name,
+                    achievements,
+                    unlocked
+                };
+            });
         } catch (e) { return []; }
     }
     getAllGames() {
@@ -333,6 +668,22 @@ class PrettyAchievementsUI {
         return merged;
     }
     // ... toutes vos autres méthodes Steam etc.
+
+    ensureRescanButton() {
+        try {
+            if (!document.getElementById('rescanMenuBtn')) {
+                const gamesSection = document.getElementById('games');
+                if (!gamesSection) return;
+                const btn = document.createElement('button');
+                btn.id = 'rescanMenuBtn';
+                btn.className = 'rescan-menu';
+                btn.title = 'Rescanner les jeux';
+                btn.textContent = '↻';
+                btn.style.display = 'none';
+                gamesSection.appendChild(btn);
+            }
+        } catch (_) { /* ignore */ }
+    }
 
     // ✅ SETTINGS EVENTS
     bindSettingsEvents() {
@@ -390,6 +741,74 @@ class PrettyAchievementsUI {
                 }
             });
         }
+    }
+
+    bindSaveSettings() {
+        const btn = document.getElementById('saveSettingsBtn');
+        if (!btn) return;
+        const setIdle = () => {
+            btn.style.background = 'var(--primary-color)';
+            btn.textContent = 'Enregistrer';
+            btn.disabled = false;
+            btn.style.opacity = '';
+        };
+        const setSuccess = () => {
+            btn.style.background = '#28a745';
+            btn.textContent = 'Enregistré ✔';
+        };
+        const setError = () => {
+            btn.style.background = '#dc3545';
+            btn.textContent = 'Erreur ✖';
+        };
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            btn.disabled = true;
+            btn.style.opacity = '0.9';
+            const payload = this.collectSettingsPayload();
+            try {
+                const res = await window.electronAPI?.invoke?.('config/save', payload);
+                if (res && res.ok) {
+                    setSuccess();
+                } else {
+                    setError();
+                }
+            } catch (_) {
+                setError();
+            } finally {
+                setTimeout(() => setIdle(), 1500);
+            }
+        });
+    }
+
+    collectSettingsPayload() {
+        const getVal = (id, fallback = '') => (document.getElementById(id)?.value ?? fallback);
+        const getBool = (id) => !!document.getElementById(id)?.checked;
+        const getNum = (id, fallback = 0) => {
+            const v = Number(document.getElementById(id)?.value);
+            return Number.isFinite(v) ? v : fallback;
+        };
+        // Collect basic settings used in UI
+        const payload = {
+            general: {
+                autoStart: getBool('autoStart'),
+                notifications: getBool('notifications'),
+                minimizeToTray: getBool('minimizeToTray'),
+                refreshEveryMinutes: getNum('refreshEveryMinutes', 15)
+            },
+            images: {
+                enableSteamImages: getBool('enableSteamImages'),
+                steamImageQuality: getVal('steamImageQuality', 'medium'),
+                imageCacheDuration: getNum('imageCacheDuration', 7)
+            },
+            detection: {
+                folders: Array.from(document.querySelectorAll('#addedScanFolders .folder-path strong')).map(el => el.textContent)
+            },
+            cache: {
+                autoRefreshCache: getBool('autoRefreshCache'),
+                cacheDuration: getNum('cacheDuration', 24)
+            }
+        };
+        return payload;
     }
 
     // ===== Dossiers à scanner - helpers =====
@@ -482,6 +901,63 @@ class PrettyAchievementsUI {
 
             input.click();
         });
+    }
+
+    sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+    async loadConfigOnStartup() {
+        try {
+            const cfg = await window.electronAPI?.invoke?.('config/load');
+            if (!cfg || typeof cfg !== 'object') return;
+            const setBool = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+            const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = String(v); };
+
+            // general
+            setBool('autoStart', cfg?.general?.autoStart);
+            setBool('notifications', cfg?.general?.notifications);
+            setBool('minimizeToTray', cfg?.general?.minimizeToTray);
+            // images
+            setBool('enableSteamImages', cfg?.images?.enableSteamImages);
+            setVal('steamImageQuality', cfg?.images?.steamImageQuality);
+            setVal('imageCacheDuration', cfg?.images?.imageCacheDuration);
+            // general extra
+            setVal('refreshEveryMinutes', cfg?.general?.refreshEveryMinutes);
+            // cache
+            setBool('autoRefreshCache', cfg?.cache?.autoRefreshCache);
+            setVal('cacheDuration', cfg?.cache?.cacheDuration);
+            // detection folders
+            if (Array.isArray(cfg?.detection?.folders)) {
+                this.scanFolders = [...cfg.detection.folders];
+                this.renderScanFolders();
+            }
+        } catch (_) { /* ignore */ }
+    }
+
+    ensureAchievementCountStyles() {
+        try {
+            if (document.getElementById('achievement-count-styles')) return;
+            const css = `
+            .achievement-count{display:block;width:100%;color:var(--text-secondary);font-weight:700;font-size:.85rem;line-height:1;text-align:right;margin-bottom:6px}
+            .sidebar-games-grid .achievement-count{font-size:.7rem;margin-bottom:4px}
+            `;
+            const style = document.createElement('style');
+            style.id = 'achievement-count-styles';
+            style.textContent = css;
+            document.head.appendChild(style);
+        } catch (_) { /* ignore */ }
+    }
+
+    renderNoGamesEmptyState() {
+        try {
+            const gamesGrid = document.getElementById('gamesGrid');
+            if (!gamesGrid) return;
+            gamesGrid.innerHTML = `
+                <div class="no-results" style="display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;min-height:200px;gap:6px;grid-column:1 / -1;justify-self:center;width:100%;">
+                    <h3 style="margin:0;">Aucun jeu détecté</h3>
+                    <p style="margin:0;color:var(--text-secondary);">Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
+                </div>
+            `;
+        } catch (_) { /* ignore */ }
     }
 
     initializeDemoData() {

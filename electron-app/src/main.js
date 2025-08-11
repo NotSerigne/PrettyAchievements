@@ -1,6 +1,7 @@
 // pretty-achievements/electron-app/src/main.js
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === 'true';
@@ -10,13 +11,14 @@ function createMainWindow() {
         width: 1200,
         height: 800,
         show: false,
+
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'), // __dirname = .../electron-app/src
             nodeIntegration: false,
             contextIsolation: true
         }
     });
-
+    win.setMenuBarVisibility(false);
     const indexHtml = path.join(__dirname, 'renderer', 'index.html');
     win.loadFile(indexHtml).catch(err => {
         console.error('Erreur loading index.html:', err);
@@ -51,7 +53,10 @@ function runGameDetector() {
             ].join('; ');
 
             const py = process.platform === 'win32' ? 'python' : 'python3';
-            const child = spawn(py, ['-c', code], { windowsHide: true });
+            const child = spawn(py, ['-c', code], {
+                windowsHide: true,
+                env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+            });
 
             let stdout = '';
             let stderr = '';
@@ -65,13 +70,40 @@ function runGameDetector() {
                 if (code !== 0) {
                     return reject(new Error(`Python exited with code ${code}: ${stderr}`));
                 }
-                try {
-                    const parsed = JSON.parse(stdout || '{}');
-                    resolve(parsed);
-                } catch (e) {
-                    console.error('Failed to parse Python output:', stdout);
-                    resolve({});
+
+                const raw = (stdout || '').trim();
+                // Try direct parse first
+                const tryParses = [];
+                tryParses.push(() => JSON.parse(raw));
+                // Extract last JSON object between braces
+                tryParses.push(() => {
+                    const start = raw.lastIndexOf('{');
+                    const end = raw.lastIndexOf('}');
+                    if (start !== -1 && end !== -1 && end > start) {
+                        const candidate = raw.slice(start, end + 1);
+                        return JSON.parse(candidate);
+                    }
+                    throw new Error('No JSON braces found');
+                });
+                // Parse last line that looks like a JSON object
+                tryParses.push(() => {
+                    const line = raw.split(/\r?\n/).reverse().find(l => {
+                        const t = l.trim();
+                        return t.startsWith('{') && t.endsWith('}');
+                    });
+                    if (line) return JSON.parse(line.trim());
+                    throw new Error('No JSON line found');
+                });
+
+                for (const fn of tryParses) {
+                    try {
+                        const parsed = fn();
+                        return resolve(parsed && typeof parsed === 'object' ? parsed : {});
+                    } catch (_) { /* try next strategy */ }
                 }
+
+                console.error('Failed to parse Python output:', stdout);
+                resolve({});
             });
         } catch (e) {
             reject(e);
@@ -123,4 +155,31 @@ if (!app.requestSingleInstanceLock()) {
 ipcMain.handle('app/get-app-path', () => app.getAppPath());
 ipcMain.handle('games/detect-cracked', async () => {
     try { return await runGameDetector(); } catch (e) { return {}; }
+});
+
+// Save config to project root config.json
+ipcMain.handle('config/save', async (_event, configObj) => {
+    try {
+        const target = path.resolve(__dirname, 'config.json');
+        const data = JSON.stringify(configObj || {}, null, 2);
+        fs.writeFileSync(target, data, 'utf-8');
+        return { ok: true, path: target };
+    } catch (err) {
+        console.error('Failed to save config.json:', err);
+        return { ok: false, error: String(err) };
+    }
+});
+
+// Load config from project root config.json
+ipcMain.handle('config/load', async () => {
+    try {
+        const target = path.resolve(__dirname, 'config.json');
+        if (!fs.existsSync(target)) return {};
+        const raw = fs.readFileSync(target, 'utf-8');
+        const parsed = JSON.parse(raw || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (err) {
+        console.error('Failed to load config.json:', err);
+        return {};
+    }
 });
