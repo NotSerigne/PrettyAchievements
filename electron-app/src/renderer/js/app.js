@@ -9,6 +9,9 @@ class PrettyAchievementsUI {
         this.initializeElements();
         this.initializeDemoData();
         this.ensureRescanButton();
+        this.ensureSortButton();
+        this.ensureToastContainer();
+        this.sortMode = this.loadSortMode(); // 'completion-desc' | 'completion-asc' | 'alpha-asc' | 'alpha-desc'
         this.bindEvents(); // ✅ Doit inclure les events burger
         this.bindSteamEvents();
         this.loadDashboard();
@@ -35,12 +38,12 @@ class PrettyAchievementsUI {
             });
         }
 
-        // Fallback: tenter une détection à la demande si rien reçu
+        // Fallback: tente une récupération via l'API backend si rien reçu
         setTimeout(async () => {
-            if (!this.detectedCrackedGames && window.electronAPI?.invoke) {
+            if (!this.detectedCrackedGames) {
                 try {
-                    const data = await window.electronAPI.invoke('games/detect-cracked');
-                    const incoming = (data && typeof data === 'object') ? data : {};
+                    const mapped = await this.fetchGamesFromBackend();
+                    const incoming = (mapped && typeof mapped === 'object') ? mapped : {};
                     const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
                     if (Object.keys(incoming).length > 0 || Object.keys(prev).length === 0) {
                         this.detectedCrackedGames = incoming;
@@ -136,6 +139,20 @@ class PrettyAchievementsUI {
             });
         }
 
+        // ✅ BOUTON TRI (top-right next to refresh)
+        this.sortBtn = document.getElementById('sortMenuBtn');
+        if (this.sortBtn) {
+            this.updateSortButtonAppearance();
+            this.sortBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.cycleSortMode();
+                // Recharger l'affichage des jeux selon le nouveau tri
+                if (document.getElementById('games')?.classList.contains('active')) {
+                    this.loadGames();
+                }
+            });
+        }
+
         // ✅ EVENTS SETTINGS
         this.bindSettingsEvents();
         this.bindSaveSettings();
@@ -219,35 +236,42 @@ class PrettyAchievementsUI {
                     this.ensureGamesLoaderVisible();
                 }
                 if (rescan) rescan.style.display = 'flex';
+                const sortBtn = document.getElementById('sortMenuBtn');
+                if (sortBtn) sortBtn.style.display = 'flex';
                 break;
             case 'achievements':
                 this.loadAchievements();
+                const sortBtnAch = document.getElementById('sortMenuBtn');
+                if (sortBtnAch) sortBtnAch.style.display = 'none';
                 break;
             case 'statistics':
                 this.loadStatistics();
+                const sortBtnStat = document.getElementById('sortMenuBtn');
+                if (sortBtnStat) sortBtnStat.style.display = 'none';
                 break;
             case 'dashboard':
                 this.loadDashboard();
+                const sortBtnDash = document.getElementById('sortMenuBtn');
+                if (sortBtnDash) sortBtnDash.style.display = 'none';
                 break;
         }
     }
 
-    // ✅ RECHERCHE
+    // ✅ RECHERCHE (sidebar uniquement)
     handleSearch(query) {
-        console.log('🔍 Search:', query);
-
-        if (!query.trim()) {
-            this.loadGames().then(() =>{} );
+        console.log('🔍 Sidebar Search:', query);
+        const q = (query || '').trim().toLowerCase();
+        if (!q) {
+            // Réinitialiser la liste de la sidebar
+            this.renderSidebarGames();
             return;
         }
-
-        // Filtrer uniquement sur les jeux détectés
         const detectedGames = this.getDetectedGames();
         const filteredGames = detectedGames.filter(game =>
-            (game.name || '').toLowerCase().includes(query.toLowerCase())
+            (game.name || '').toLowerCase().includes(q)
         );
-
-        this.displayFilteredGames(filteredGames);
+        // Afficher uniquement dans la sidebar, sans impacter la page Jeux
+        this.renderSidebarGames(filteredGames);
     }
 
     displayFilteredGames(games) {
@@ -266,6 +290,7 @@ class PrettyAchievementsUI {
             return;
         }
 
+        games = this.sortGames(games);
         games.forEach(game => {
             const achievements = Number(game.achievements || 0);
             const unlocked = Number(game.unlocked || 0);
@@ -275,6 +300,7 @@ class PrettyAchievementsUI {
             gameCard.innerHTML = this.createGameCardHTML(game, progress, null);
             gamesGrid.appendChild(gameCard);
         });
+        this.applyStaggerAnimation();
     }
 
     renderDetectedCrackedGames() {
@@ -285,6 +311,42 @@ class PrettyAchievementsUI {
         const isActive = gamesSection.classList.contains('active');
         if (isActive) {
             this.loadGames();
+        }
+    }
+
+    // Fetch games from backend API, trying HTTPS first then HTTP
+    async fetchGamesFromBackend() {
+        const urls = ['http://localhost:5000/api/games'];
+        for (const url of urls) {
+            try {
+                const res = await fetch(url, { method: 'GET' });
+                if (!res.ok) continue;
+                const json = await res.json();
+                if (json && json.success && Array.isArray(json.games)) {
+                    return this.mapBackendGames(json.games);
+                }
+            } catch (_) { /* try next */ }
+        }
+        return null;
+    }
+
+    mapBackendGames(gamesArray) {
+        try {
+            const out = {};
+            (gamesArray || []).forEach(g => {
+                const appId = String(g.app_id ?? g.id ?? '').trim();
+                if (!appId) return;
+                const achievements = Number(g.local_achievements_count || g.totalAchievements || 0) || 0;
+                const unlocked = Number(g.unlocked || 0) || 0;
+                out[appId] = {
+                    name: String(g.name || `App ${appId}`),
+                    achievements,
+                    unlocked
+                };
+            });
+            return out;
+        } catch (_) {
+            return {};
         }
     }
 
@@ -303,18 +365,10 @@ class PrettyAchievementsUI {
         if (prevCount === 0 && gamesGrid) gamesGrid.innerHTML = '';
         this.showGamesLoading();
         try {
-            let data = null;
-            if (window.electronAPI?.invoke) {
-                data = await window.electronAPI.invoke('games/detect-cracked').catch(() => null);
-                let count = data && typeof data === 'object' ? Object.keys(data).length : 0;
-                if (count === 0) {
-                    await this.sleep(800);
-                    const retry = await window.electronAPI.invoke('games/detect-cracked').catch(() => null);
-                    if (retry) {
-                        data = retry;
-                        count = data && typeof data === 'object' ? Object.keys(data).length : 0;
-                    }
-                }
+            let mapped = await this.fetchGamesFromBackend();
+            if (!mapped) {
+                await this.sleep(800);
+                mapped = await this.fetchGamesFromBackend();
             }
 
             if (localScanId !== this.scanSeq) {
@@ -322,17 +376,18 @@ class PrettyAchievementsUI {
                 return;
             }
 
-            const prevCount = this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object' ? Object.keys(this.detectedCrackedGames).length : 0;
-            const newCount = data && typeof data === 'object' ? Object.keys(data).length : 0;
-            if (newCount > 0 || prevCount === 0) {
+            const prevCountNow = this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object' ? Object.keys(this.detectedCrackedGames).length : 0;
+            const newCount = mapped && typeof mapped === 'object' ? Object.keys(mapped).length : 0;
+            if (newCount > 0 || prevCountNow === 0) {
                 // Remplacer uniquement si on a de nouvelles données, ou si on n'avait rien avant
-                this.detectedCrackedGames = data || {};
+                this.detectedCrackedGames = mapped || {};
                 if (newCount > 0) this.lastDetectedCrackedGames = this.detectedCrackedGames;
             }
-            if (newCount === 0 && prevCount === 0 && (!this.lastDetectedCrackedGames || Object.keys(this.lastDetectedCrackedGames).length === 0)) {
+            if (newCount === 0 && prevCountNow === 0 && (!this.lastDetectedCrackedGames || Object.keys(this.lastDetectedCrackedGames).length === 0)) {
                 this.renderNoGamesEmptyState();
             } else {
                 await this.loadGames();
+                await this.waitForGameCardsVisible();
             }
             this.renderSidebarGames();
         } catch (e) {
@@ -473,22 +528,17 @@ class PrettyAchievementsUI {
         if (!container) return;
         setTimeout(() => {
             container.style.display = '';
-            // Also finalize and hide the loader in the games page if present
-            const barMain = document.getElementById('gamesProgressBarInner');
-            if (barMain && done) barMain.style.width = '100%';
-            const gamesEl = this.gamesLoadingEl || document.getElementById('gamesLoading');
-            if (gamesEl) {
-                gamesEl.style.display = 'none';
-                gamesEl.innerHTML = '';
-            }
+            // Ne pas cacher le loader de la page Jeux ici; il sera géré par hideGamesLoading
         }, done ? 150 : 0);
     }
-    renderSidebarGames() {
+    renderSidebarGames(gamesList) {
         const container = this.sidebarListEl || document.querySelector('.scrollable-content');
         if (!container) return;
-        const games = this.getDetectedGames();
+        const usingFilter = Array.isArray(gamesList);
+        const games = usingFilter ? gamesList : this.getDetectedGames();
         if (!games || games.length === 0) {
-            container.innerHTML = '<div class="sidebar-note" style="color:var(--text-secondary);font-size:0.9rem;padding:8px 4px;text-align:center;">Aucun jeu détecté pour le moment.</div>';
+            const msg = usingFilter ? 'Aucun jeu trouvé' : 'Aucun jeu détecté pour le moment.';
+            container.innerHTML = `<div class="sidebar-note" style="color:var(--text-secondary);font-size:0.9rem;padding:8px 4px;text-align:center;">${msg}</div>`;
             return;
         }
         const cards = games.map(game => {
@@ -498,6 +548,8 @@ class PrettyAchievementsUI {
             return `<div class="game-card">${this.createGameCardHTML(game, progress, null)}</div>`;
         }).join('');
         container.innerHTML = `<div class="games-grid sidebar-games-grid">${cards}</div>`;
+        const gridEl = container.querySelector('.games-grid');
+        if (gridEl) this.applyStaggerAnimationIn(gridEl, 30, 1200);
         if (!container._sgClickBound) {
             container.addEventListener('click', (e) => {
                 const card = e.target.closest?.('.game-card');
@@ -511,7 +563,6 @@ class PrettyAchievementsUI {
     }
     async scanOnStartup() {
         try {
-            if (!window.electronAPI?.invoke) return;
             if (this.isScanning) return;
             this.isScanning = true;
             this.showSidebarLoading();
@@ -526,8 +577,8 @@ class PrettyAchievementsUI {
                 if (barMain) barMain.style.width = progress + '%';
             }, 300);
 
-            const data = await window.electronAPI.invoke('games/detect-cracked');
-            const incoming = (data && typeof data === 'object') ? data : {};
+            const mapped = await this.fetchGamesFromBackend();
+            const incoming = (mapped && typeof mapped === 'object') ? mapped : {};
             const prev = (this.detectedCrackedGames && typeof this.detectedCrackedGames === 'object') ? this.detectedCrackedGames : {};
             if (Object.keys(incoming).length > 0 || Object.keys(prev).length === 0) {
                 this.detectedCrackedGames = incoming;
@@ -537,7 +588,14 @@ class PrettyAchievementsUI {
         } catch (e) {
             console.warn('startup scan failed:', e);
         } finally {
-            this.hideSidebarLoading(true);
+            try {
+                const gamesActive = document.getElementById('games')?.classList.contains('active');
+                if (gamesActive) {
+                    await this.loadGames();
+                    await this.waitForGameCardsVisible();
+                }
+            } catch (_) { /* ignore */ }
+            this.hideGamesLoading(true);
             if (this._progressTimer) {
                 clearInterval(this._progressTimer);
                 this._progressTimer = null;
@@ -553,7 +611,8 @@ class PrettyAchievementsUI {
 
         const detected = this.getDetectedGames();
 
-        const toRender = detected;
+        // Appliquer le tri courant
+        const toRender = this.sortGames(detected);
 
         if (toRender.length === 0) {
             gamesGrid.innerHTML = `
@@ -574,6 +633,7 @@ class PrettyAchievementsUI {
             gameCard.innerHTML = this.createGameCardHTML(game, progress, null);
             gamesGrid.appendChild(gameCard);
         });
+        this.applyStaggerAnimation();
     }
     createGameCardHTML(game, progress, steamData) {
         const appId = game.steamAppId || game.appId || game.id || '';
@@ -625,9 +685,136 @@ class PrettyAchievementsUI {
           </div>
         `;
     }
-    loadDashboard() { /* ... votre code dashboard ... */ }
+    async loadDashboard() {
+        try {
+            // 1) Supprimer la carte "Succès Totaux" si présente
+            const totalAchEl = document.getElementById('totalAchievements');
+            if (totalAchEl) {
+                const card = totalAchEl.closest('.stat-card');
+                if (card && card.parentNode) card.parentNode.removeChild(card);
+            }
+
+            // 2) Renommer la carte de complétion
+            const completionEl = document.getElementById('completionRate');
+            if (completionEl) {
+                const compCard = completionEl.closest('.stat-card');
+                const header = compCard?.querySelector('h3');
+                if (header) header.textContent = 'Taux de Complétion Moyen';
+            }
+
+            // 3) Récupérer total_games depuis l'API backend
+            const totalGamesEl = document.getElementById('totalGames');
+            let totalGamesVal = null;
+            try {
+                const res = await fetch('http://localhost:5000/api/games', { method: 'GET' });
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json && json.success && Number.isFinite(json.total_games)) {
+                        totalGamesVal = json.total_games;
+                    }
+                }
+            } catch (_) { /* ignore, fallback below */ }
+
+            // 4) Calcul des métriques locales à partir des jeux détectés
+            const games = this.getDetectedGames();
+            const fallbackTotal = Array.isArray(games) ? games.length : 0;
+            if (totalGamesEl) {
+                const target = Number(totalGamesVal ?? fallbackTotal) || 0;
+                this.animateCounter(totalGamesEl, target, 900);
+            }
+
+            let sumUnlocked = 0;
+            let sumRatio = 0;
+            let countWithAchievements = 0;
+            for (const g of games) {
+                const a = Number(g.achievements || 0);
+                const u = Number(g.unlocked || 0);
+                sumUnlocked += Number.isFinite(u) ? u : 0;
+                if (a > 0) {
+                    sumRatio += Math.max(0, Math.min(1, u / a));
+                    countWithAchievements += 1;
+                }
+            }
+            // Total succès débloqués
+            const unlockedEl = document.getElementById('unlockedAchievements');
+            if (unlockedEl) unlockedEl.textContent = String(sumUnlocked);
+
+            // Taux de complétion moyen (en %)
+            const avg = countWithAchievements > 0 ? (sumRatio / countWithAchievements) * 100 : 0;
+            if (completionEl) completionEl.textContent = `${Math.round(avg)}%`;
+        } catch (_) { /* ignore dashboard errors */ }
+    }
     loadAchievements() { /* ... votre code achievements ... */ }
     loadStatistics() { /* ... votre code stats ... */ }
+
+    // ===== TRI DES JEUX =====
+    sortGames(arr) {
+        try {
+            const list = Array.isArray(arr) ? arr.slice() : [];
+            const mode = this.sortMode || 'completion-desc';
+            const pct = (g) => {
+                const a = Number(g.achievements || 0);
+                const u = Number(g.unlocked || 0);
+                if (!Number.isFinite(a) || a <= 0) return 0;
+                return u / a;
+            };
+            if (mode === 'completion-desc') {
+                list.sort((a, b) => pct(b) - pct(a) || (a.name || '').localeCompare(b.name || ''));
+            } else if (mode === 'completion-asc') {
+                list.sort((a, b) => pct(a) - pct(b) || (a.name || '').localeCompare(b.name || ''));
+            } else if (mode === 'alpha-asc') {
+                list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            } else if (mode === 'alpha-desc') {
+                list.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+            }
+            return list;
+        } catch (_) { return arr; }
+    }
+
+    cycleSortMode() {
+        const order = ['completion-desc', 'completion-asc', 'alpha-asc', 'alpha-desc'];
+        const idx = Math.max(0, order.indexOf(this.sortMode || 'completion-desc'));
+        const next = order[(idx + 1) % order.length];
+        this.sortMode = next;
+        this.saveSortMode(next);
+        this.updateSortButtonAppearance();
+    }
+
+    updateSortButtonAppearance() {
+        try {
+            const btn = this.sortBtn || document.getElementById('sortMenuBtn');
+            if (!btn) return;
+            let label = '';
+            let title = '';
+            switch (this.sortMode) {
+                case 'completion-desc':
+                    label = '％↓';
+                    title = 'Tri: completion décroissant';
+                    break;
+                case 'completion-asc':
+                    label = '％↑';
+                    title = 'Tri: completion croissant';
+                    break;
+                case 'alpha-asc':
+                    label = 'A→Z';
+                    title = 'Tri: alphabétique croissant';
+                    break;
+                case 'alpha-desc':
+                    label = 'Z→A';
+                    title = 'Tri: alphabétique décroissant';
+                    break;
+            }
+            btn.textContent = label;
+            btn.title = title;
+        } catch (_) { /* ignore */ }
+    }
+
+    saveSortMode(mode) {
+        try { localStorage.setItem('sortMode', String(mode || '')); } catch (_) {}
+    }
+    loadSortMode() {
+        try { return localStorage.getItem('sortMode') || 'completion-desc'; } catch (_) { return 'completion-desc'; }
+    }
     getDetectedGames() {
         try {
             const base = this.detectedCrackedGames || {};
@@ -685,6 +872,25 @@ class PrettyAchievementsUI {
         } catch (_) { /* ignore */ }
     }
 
+    ensureSortButton() {
+        try {
+            if (!document.getElementById('sortMenuBtn')) {
+                const gamesSection = document.getElementById('games');
+                if (!gamesSection) return;
+                const btn = document.createElement('button');
+                btn.id = 'sortMenuBtn';
+                btn.className = 'rescan-menu sort-menu';
+                btn.title = 'Changer le tri';
+                btn.textContent = '';
+                btn.style.display = 'none';
+                btn.style.right = '80px';
+                gamesSection.appendChild(btn);
+                this.sortBtn = btn;
+                this.updateSortButtonAppearance();
+            }
+        } catch (_) { /* ignore */ }
+    }
+
     // ✅ SETTINGS EVENTS
     bindSettingsEvents() {
         // Contrôles pour l'ajout de dossiers à scanner
@@ -692,6 +898,15 @@ class PrettyAchievementsUI {
         this.addScanFolderBtn = document.getElementById('addScanFolderBtn');
         this.addedScanFoldersList = document.getElementById('addedScanFolders');
         this.browseScanFolderBtn = document.querySelector('.browse-btn[data-target="scanFolderPath"]');
+
+        // Bouton test notification
+        this.testNotificationBtn = document.getElementById('testNotificationBtn');
+        if (this.testNotificationBtn) {
+            this.testNotificationBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await this.triggerTestNotification();
+            });
+        }
 
         // Charger depuis le stockage et afficher
         this.scanFolders = this.loadScanFolders();
@@ -905,6 +1120,30 @@ class PrettyAchievementsUI {
 
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+    // Attend que les cartes de jeux soient présentes et aient eu le temps de s'afficher
+    async waitForGameCardsVisible(maxWait = 1500) {
+        const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        return new Promise((resolve) => {
+            const check = () => {
+                const grid = document.getElementById('gamesGrid');
+                const first = grid && grid.querySelector('.game-card');
+                if (first) {
+                    // Laisser un frame + petite marge pour éviter un flash entre loader et fade-in
+                    if (typeof requestAnimationFrame === 'function') {
+                        requestAnimationFrame(() => setTimeout(resolve, 150));
+                    } else {
+                        setTimeout(resolve, 150);
+                    }
+                    return;
+                }
+                const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                if (now - start > maxWait) return resolve();
+                setTimeout(check, 50);
+            };
+            check();
+        });
+    }
+
     async loadConfigOnStartup() {
         try {
             const cfg = await window.electronAPI?.invoke?.('config/load');
@@ -945,6 +1184,197 @@ class PrettyAchievementsUI {
             style.textContent = css;
             document.head.appendChild(style);
         } catch (_) { /* ignore */ }
+    }
+
+    // Applique un délai d'animation progressif sur les cartes de jeux du grid principal
+    applyStaggerAnimation(baseDelayMs = 40, maxDelayMs = 2000) {
+        try {
+            const grid = document.getElementById('gamesGrid');
+            if (!grid) return;
+            const cards = Array.from(grid.querySelectorAll('.game-card'));
+            cards.forEach((card, idx) => {
+                const delay = Math.min((idx + 1) * baseDelayMs, maxDelayMs);
+                card.style.animationDelay = `${delay}ms`;
+            });
+        } catch (_) { /* ignore */ }
+    }
+
+    // Version générique permettant de cibler n'importe quel conteneur de cartes (ex: sidebar)
+    applyStaggerAnimationIn(containerEl, baseDelayMs = 40, maxDelayMs = 2000) {
+        try {
+            if (!containerEl) return;
+            const cards = Array.from(containerEl.querySelectorAll('.game-card'));
+            cards.forEach((card, idx) => {
+                const delay = Math.min((idx + 1) * baseDelayMs, maxDelayMs);
+                card.style.animationDelay = `${delay}ms`;
+            });
+        } catch (_) { /* ignore */ }
+    }
+
+    // Crée dynamiquement la section Notifications dans les réglages avec un bouton de test
+    ensureNotificationSettings() {
+        try {
+            if (document.getElementById('notificationsGroup')) return;
+            const container = document.querySelector('#settings .settings-container');
+            if (!container) return;
+            const group = document.createElement('div');
+            group.className = 'settings-group';
+            group.id = 'notificationsGroup';
+            group.innerHTML = `
+                <h3>Notifications</h3>
+                <div class="setting-item">
+                    <label style="color:var(--text-primary);font-weight:500;margin-bottom:6px;">Position de la notification</label>
+                    <div class="notify-position-grid" id="notifyPositionGrid">
+                        <button class="notify-cell" data-position="top-left" title="Haut gauche"></button>
+                        <button class="notify-cell" data-position="top-center" title="Haut centre"></button>
+                        <button class="notify-cell" data-position="top-right" title="Haut droite"></button>
+                        <div class="notify-cell disabled" aria-disabled="true"></div>
+                        <div class="notify-cell disabled" aria-disabled="true"></div>
+                        <div class="notify-cell disabled" aria-disabled="true"></div>
+                        <button class="notify-cell" data-position="bottom-left" title="Bas gauche"></button>
+                        <button class="notify-cell" data-position="bottom-center" title="Bas centre"></button>
+                        <button class="notify-cell" data-position="bottom-right" title="Bas droite"></button>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <button class="browse-btn" id="testNotificationBtn">Tester la notification</button>
+                </div>
+                <div id="testNotificationFeedback" style="margin-top:8px;color:var(--text-secondary);font-size:0.9rem;"></div>
+            `;
+            container.appendChild(group);
+            this.initNotifyPositionGrid();
+        } catch (_) { /* ignore */ }
+    }
+
+    // Déclenche une notification de test (Toast HTML/CSS custom)
+    async triggerTestNotification() {
+        const feedback = document.getElementById('testNotificationFeedback');
+        const setFeedback = (msg, ok = true) => {
+            if (!feedback) return;
+            feedback.textContent = msg;
+            feedback.style.color = ok ? 'var(--text-secondary)' : '#dc3545';
+        };
+        try {
+            const enabled = !!document.getElementById('notifications')?.checked;
+            if (!enabled) {
+                setFeedback('Astuce: Activez l’option Notifications dans Général pour les recevoir automatiquement.');
+            } else {
+                setFeedback('Notification affichée.');
+            }
+            const position = this.getSavedNotifyPosition();
+            // Overlay OS-level style (outside app window)
+            try {
+                await window.electronAPI?.invoke?.('notify/custom', {
+                    title: 'Pretty Achievements',
+                    message: 'Ceci est une notification de test 🎉',
+                    type: 'info',
+                    duration: 4000,
+                    position
+                });
+            } catch (_) {
+                // Fallback to in-app toast if IPC fails
+                this.showCustomNotification({ title: 'Pretty Achievements', message: 'Ceci est une notification de test 🎉', type: 'info', duration: 4000 });
+            }
+        } catch (e) {
+            setFeedback('Erreur lors de l’affichage de la notification.', false);
+            try { console.warn('Test notification failed:', e); } catch (_) {}
+        }
+    }
+
+    // Anime un compteur numérique de sa valeur actuelle vers une cible
+    animateCounter(el, to, duration = 800) {
+        try {
+            const from = Math.max(0, parseInt(String(el.textContent).replace(/[^0-9-]/g, ''), 10) || 0);
+            const target = Math.max(0, Number(to) || 0);
+            if (from === target) { el.textContent = String(target); return; }
+            const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+            const step = () => {
+                const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                const t = Math.min(1, (now - start) / duration);
+                const eased = easeOutCubic(t);
+                const current = Math.round(from + (target - from) * eased);
+                el.textContent = String(current);
+                if (t < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    el.textContent = String(target);
+                }
+            };
+            requestAnimationFrame(step);
+        } catch (_) {
+            el.textContent = String(to);
+        }
+    }
+
+    // ===== TOAST CUSTOM NOTIFICATIONS =====
+    ensureToastContainer() {
+        try {
+            if (document.getElementById('paToastContainer')) return;
+            const c = document.createElement('div');
+            c.id = 'paToastContainer';
+            c.className = 'pa-toast-container';
+            document.body.appendChild(c);
+        } catch (_) { /* ignore */ }
+    }
+
+    showCustomNotification({ title = 'Notification', message = '', type = 'info', duration = 4000 } = {}) {
+        try {
+            this.ensureToastContainer();
+            const container = document.getElementById('paToastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `pa-toast pa-${type}`;
+            container.appendChild(toast);
+            // Close logic
+            const close = () => {
+                if (!toast._closing) {
+                    toast._closing = true;
+                    toast.classList.add('pa-hide');
+                    setTimeout(() => {
+                        try { toast.remove(); } catch (_) {}
+                    }, 220);
+                }
+            };
+            toast.querySelector('.pa-toast-close')?.addEventListener('click', close);
+            // Auto close
+            if (duration > 0) setTimeout(close, duration);
+        } catch (_) { /* ignore */ }
+    }
+
+    // ===== NOTIFY POSITION HELPERS =====
+    initNotifyPositionGrid() {
+        try {
+            const grid = document.getElementById('notifyPositionGrid');
+            if (!grid) return;
+            const saved = this.getSavedNotifyPosition();
+            const cells = Array.from(grid.querySelectorAll('.notify-cell'));
+            // Init active state
+            cells.forEach(c => {
+                if (c.classList.contains('disabled')) return;
+                const p = c.getAttribute('data-position');
+                if (p === saved) c.classList.add('active');
+            });
+            if (!cells.some(c => c.classList.contains('active'))) {
+                const def = grid.querySelector('[data-position="bottom-right"]');
+                if (def) def.classList.add('active');
+            }
+            // Click handling (single active)
+            grid.addEventListener('click', (e) => {
+                const btn = e.target.closest?.('.notify-cell');
+                if (!btn || btn.classList.contains('disabled')) return;
+                cells.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                const pos = btn.getAttribute('data-position') || 'bottom-right';
+                this.setSavedNotifyPosition(pos);
+            });
+        } catch (_) { /* ignore */ }
+    }
+    getSavedNotifyPosition() {
+        try { return localStorage.getItem('notifyPosition') || 'bottom-right'; } catch (_) { return 'bottom-right'; }
+    }
+    setSavedNotifyPosition(pos) {
+        try { localStorage.setItem('notifyPosition', String(pos || 'bottom-right')); } catch (_) {}
     }
 
     renderNoGamesEmptyState() {

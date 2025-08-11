@@ -68,15 +68,11 @@
                 <div class="stat-number" id="totalGames">0</div>
             </div>
             <div class="stat-card">
-                <h3>Succès Totaux</h3>
-                <div class="stat-number" id="totalAchievements">0</div>
-            </div>
-            <div class="stat-card">
                 <h3>Succès Débloqués</h3>
                 <div class="stat-number" id="unlockedAchievements">0</div>
             </div>
             <div class="stat-card">
-                <h3>Taux de Complétion</h3>
+                <h3>Taux de Complétion moyen</h3>
                 <div class="stat-number" id="completionRate">0%</div>
             </div>
         </div>
@@ -117,91 +113,133 @@
             <div class="settings-group">
                 <h3>Général</h3>
 
-                    <div class="setting-item">
-                        <div class="setting-toggle">
-                            <label for="autoStart">Démarrage automatique</label>
-                            <input type="checkbox" id="autoStart">
-                            <span class="switch" aria-hidden="true"></span>
-                        </div>
+                <div class="setting-item">
+                    <div class="setting-toggle">
+                        <label for="autoStart">Démarrage automatique</label>
+                        <input type="checkbox" id="autoStart">
+                        <span class="switch" aria-hidden="true"></span>
                     </div>
+                </div>
 
-                    <div class="setting-item">
-                        <div class="setting-toggle">
-                            <label for="notifications">Notifications</label>
-                            <input type="checkbox" id="notifications" checked>
-                            <span class="switch" aria-hidden="true"></span>
-                        </div>
+                <div class="setting-item">
+                    <div class="setting-toggle">
+                        <label for="notifications">Notifications</label>
+                        <input type="checkbox" id="notifications" checked>
+                        <span class="switch" aria-hidden="true"></span>
                     </div>
+                </div>
 
-                    <div class="setting-item">
-                        <div class="setting-toggle">
-                            <label for="minimizeToTray">Minimiser dans la barre</label>
-                            <input type="checkbox" id="minimizeToTray">
-                            <span class="switch" aria-hidden="true"></span>
-                        </div>
+                <div class="setting-item">
+                    <div class="setting-toggle">
+                        <label for="minimizeToTray">Minimiser dans la barre</label>
+                        <input type="checkbox" id="minimizeToTray">
+                        <span class="switch" aria-hidden="true"></span>
                     </div>
+                </div>
 
-                    <div class="setting-item">
-                        <div class="setting-toggle">
-                            <label for="refreshEveryMinutes">Rafraîchissement toutes les</label>
-                            <input type="number" id="refreshEveryMinutes" min="1" max="10080" value="15" style="width:90px;margin-left:auto;">
-                            <span style="margin-left:8px;color:var(--text-secondary)">minutes</span>
+                <div class="setting-item">
+                    <div class="setting-toggle">
+                        <label for="refreshEveryMinutes">Rafraîchissement toutes les</label>
+                        <input type="number" id="refreshEveryMinutes" min="1" max="10080" value="15" style="width:90px;margin-left:auto;">
+                        <span style="margin-left:8px;color:var(--text-secondary)">minutes</span>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Notifications</h3>
+                <div class="setting-item" style="display:flex;justify-content:space-between;gap:18px;">
+                    <div style="flex:1;min-width:120px;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;">
+                            <label style="color:var(--text-primary);font-weight:500;margin-top:0;">Position de la notification</label>
+                            <div class="notify-position-grid" id="notifyPositionGrid">
+                                <button class="notify-cell" data-position="top-left" title="Haut gauche"></button>
+                                <button class="notify-cell" data-position="top-center" title="Haut centre"></button>
+                                <button class="notify-cell" data-position="top-right" title="Haut droite"></button>
+                                <div class="notify-cell disabled" aria-disabled="true"></div>
+                                <div class="notify-cell disabled" aria-disabled="true"></div>
+                                <div class="notify-cell disabled" aria-disabled="true"></div>
+                                <button class="notify-cell" data-position="bottom-left" title="Bas gauche"></button>
+                                <button class="notify-cell" data-position="bottom-center" title="Bas centre"></button>
+                                <button class="notify-cell" data-position="bottom-right" title="Bas droite"></button>
+                            </div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <button class="browse-btn" id="testNotificationBtn">Tester la notification</button>
+                            <div id="testNotificationFeedback" style="color:var(--text-secondary);font-size:0.9rem;"></div>
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;">
+                            <label style="color:var(--text-primary);font-weight:500;">Son de la notification</label>
+                            <select id="notificationSound" style="padding:6px 12px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);min-width:150px;">
+                                <option value="none">Aucun son</option>
+                                <option value="steam">Steam</option>
+                                <option value="steam-deck">Steam Deck</option>
+                                <option value="xbox">Xbox</option>
+                                <option value="xbox-rare">Xbox (rare)</option>
+                                <option value="ps4">PS4</option>
+                                <option value="ps5">PS5</option>
+                                <option value="win8">Windows 8</option>
+                                <option value="win10">Windows 10</option>
+                                <option value="win11">Windows 11</option>
+                                <option value="gog">GOG Galaxy</option>
+                                <option value="popcorn">Pop corn</option>
+                            </select>
                         </div>
                     </div>
                 </div>
+            </div>
             <div class="settings-group">
                 <h3>Images</h3>
-                    <div class="setting-item">
-                        <div class="setting-toggle">
-                            <label for="enableSteamImages">Charger images Steam officielles</label>
-                            <input type="checkbox" id="enableSteamImages" checked>
-                            <span class="switch" aria-hidden="true"></span>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <label>Type d'image</label>
-                        <label for="steamImageQuality"></label><select id="steamImageQuality">
-                            <option value="high">Hero</option>
-                            <option value="medium">Header</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label>Cache images (jours)</label>
-                        <label for="imageCacheDuration"></label><input type="number" id="imageCacheDuration" min="1" max="30" value="7">
-                    </div>
-                    <div class="setting-item">
-                        <div class="cache-actions">
-                            <button class="test-steam-btn">🧪 Tester Steam</button>
-                            <button class="clear-image-cache-btn">🗑️ Vider Cache Images</button>
-                        </div>
-                    </div>
-            </div>
-
-                <div class="settings-group">
-                    <h3>Détection des Jeux</h3>
-                    <div class="setting-item">
-                        <h4>Dossiers par défaut recherchés :</h4>
-                        <ul class="default-paths">
-                            <li>📁 <strong>%public%/documents/steam/rune/[AppID]/achievements.ini</strong></li>
-                            <li>📁 <strong>%public%/documents/steam/codex/[AppID]/achievements.ini</strong></li>
-                            <li>📁 <strong>%appdata%/steam/codex/[AppID]/achievements.ini</strong></li>
-                        </ul>
-                    </div>
-                    <div class="setting-item">
-                        <label>Ajouter un dossier à scanner</label>
-                        <div class="folder-input-group">
-                            <label for="scanFolderPath"></label><input type="text" id="scanFolderPath" placeholder="Sélectionner un dossier...">
-                            <button class="browse-btn" data-target="scanFolderPath">Parcourir</button>
-                            <button class="browse-btn add-folder-btn" id="addScanFolderBtn">Ajouter</button>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <label>Dossiers ajoutés</label>
-                        <ul id="addedScanFolders" class="added-folders-list">
-                            <!-- Les dossiers ajoutés s'afficheront ici -->
-                        </ul>
+                <div class="setting-item">
+                    <div class="setting-toggle">
+                        <label for="enableSteamImages">Charger images Steam officielles</label>
+                        <input type="checkbox" id="enableSteamImages" checked>
+                        <span class="switch" aria-hidden="true"></span>
                     </div>
                 </div>
+                <div class="setting-item">
+                    <label>Type d'image</label>
+                    <label for="steamImageQuality"></label><select id="steamImageQuality">
+                    <option value="high">Hero</option>
+                    <option value="medium">Header</option>
+                </select>
+                </div>
+                <div class="setting-item">
+                    <label>Cache images (jours)</label>
+                    <label for="imageCacheDuration"></label><input type="number" id="imageCacheDuration" min="1" max="30" value="7">
+                </div>
+                <div class="setting-item">
+                    <div class="cache-actions">
+                        <button class="test-steam-btn">🧪 Tester Steam</button>
+                        <button class="clear-image-cache-btn">🗑️ Vider Cache Images</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Détection des Jeux</h3>
+                <div class="setting-item">
+                    <h4>Dossiers par défaut recherchés :</h4>
+                    <ul class="default-paths">
+                        <li>📁 <strong>%public%/documents/steam/rune/[AppID]/achievements.ini</strong></li>
+                        <li>📁 <strong>%public%/documents/steam/codex/[AppID]/achievements.ini</strong></li>
+                        <li>📁 <strong>%appdata%/steam/codex/[AppID]/achievements.ini</strong></li>
+                    </ul>
+                </div>
+                <div class="setting-item">
+                    <label>Ajouter un dossier à scanner</label>
+                    <div class="folder-input-group">
+                        <label for="scanFolderPath"></label><input type="text" id="scanFolderPath" placeholder="Sélectionner un dossier...">
+                        <button class="browse-btn" data-target="scanFolderPath">Parcourir</button>
+                        <button class="browse-btn add-folder-btn" id="addScanFolderBtn">Ajouter</button>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>Dossiers ajoutés</label>
+                    <ul id="addedScanFolders" class="added-folders-list">
+                        <!-- Les dossiers ajoutés s'afficheront ici -->
+                    </ul>
+                </div>
+            </div>
             <div class="settings-group">
                 <h3>Cache & Performance</h3>
                 <div class="setting-item">

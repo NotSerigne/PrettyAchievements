@@ -1211,7 +1211,7 @@ body {
 
 /* Conteneur de progression réduit, à droite */
 .sidebar-games-grid .game-progress-container {
-    width: 70px;
+    width: 90px;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -1227,6 +1227,10 @@ body {
 .sidebar-games-grid .progress-text {
     font-size: 0.75rem;
     text-align: right;
+    white-space: nowrap;
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ===== RESCAN ICON (top-right) ===== */
@@ -1272,6 +1276,77 @@ body {
     min-height: 220px;
 }
 
+/* ===== NOTIFY POSITION GRID ===== */
+.notify-position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 32px);
+    grid-template-rows: repeat(3, 32px);
+    gap: 6px;
+    margin: 8px 0 12px 0;
+    justify-content: flex-start;
+}
+.notify-cell {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    border: 2px solid #444;
+    background: #232323;
+    cursor: pointer;
+    transition: border 0.18s, box-shadow 0.18s;
+    outline: none;
+    box-shadow: none;
+    position: relative;
+}
+.notify-cell.active {
+    border: 2.5px solid var(--primary-color);
+    background: linear-gradient(135deg, #3a4a6a 60%, #679cdf 100%);
+    box-shadow: 0 2px 8px rgba(103,156,223,0.18);
+}
+.notify-cell:hover:not(.active):not(.disabled) {
+    border-color: var(--primary-color);
+    background: #2a2a2a;
+}
+.notify-cell.disabled {
+    background: transparent;
+    border: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ===== TOAST NOTIFICATIONS ===== */
+.pa-toast-container {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 2000;
+}
+.pa-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 260px;
+    max-width: 360px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #222;
+    border: 1px solid #444;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    color: var(--text-primary);
+    animation: pa-toast-in .2s ease-out;
+}
+.pa-toast.pa-info { border-color: #4a78c2; }
+.pa-toast.pa-success { border-color: #28a745; }
+.pa-toast.pa-error { border-color: #dc3545; }
+.pa-toast-content { flex: 1 1 auto; }
+.pa-toast-title { font-weight: 700; margin-bottom: 2px; }
+.pa-toast-message { color: var(--text-secondary); font-size: 0.95rem; }
+.pa-toast-close { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; }
+.pa-hide { opacity: 0; transform: translateY(6px); transition: all .2s ease-in; }
+@keyframes pa-toast-in { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+
 /* ===== GLOBAL: Hide all scrollbars while keeping scroll functionality ===== */
 /* Chrome, Safari, Opera (WebKit/Blink) */
 *::-webkit-scrollbar {
@@ -1291,4 +1366,52 @@ body {
 /* IE and old Edge */
 * {
     -ms-overflow-style: none !important;
+}
+
+/* ===== GAME CARD FADE-IN ANIMATION ===== */
+@keyframes pa-fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Apply only to main games grid cards to avoid over-animating sidebar */
+.games-grid .game-card {
+  opacity: 0;
+  animation: pa-fade-in-up 380ms ease-out forwards;
+  will-change: transform, opacity;
+}
+
+/* Staggered animation delays for a smooth cascade */
+.games-grid .game-card:nth-child(1) { animation-delay: 40ms; }
+.games-grid .game-card:nth-child(2) { animation-delay: 80ms; }
+.games-grid .game-card:nth-child(3) { animation-delay: 120ms; }
+.games-grid .game-card:nth-child(4) { animation-delay: 160ms; }
+.games-grid .game-card:nth-child(5) { animation-delay: 200ms; }
+.games-grid .game-card:nth-child(6) { animation-delay: 240ms; }
+.games-grid .game-card:nth-child(7) { animation-delay: 280ms; }
+.games-grid .game-card:nth-child(8) { animation-delay: 320ms; }
+.games-grid .game-card:nth-child(9) { animation-delay: 360ms; }
+.games-grid .game-card:nth-child(10) { animation-delay: 400ms; }
+.games-grid .game-card:nth-child(11) { animation-delay: 440ms; }
+.games-grid .game-card:nth-child(12) { animation-delay: 480ms; }
+.games-grid .game-card:nth-child(13) { animation-delay: 520ms; }
+.games-grid .game-card:nth-child(14) { animation-delay: 560ms; }
+.games-grid .game-card:nth-child(15) { animation-delay: 600ms; }
+.games-grid .game-card:nth-child(16) { animation-delay: 640ms; }
+.games-grid .game-card:nth-child(17) { animation-delay: 680ms; }
+.games-grid .game-card:nth-child(18) { animation-delay: 720ms; }
+.games-grid .game-card:nth-child(19) { animation-delay: 760ms; }
+.games-grid .game-card:nth-child(20) { animation-delay: 800ms; }
+.games-grid .game-card:nth-child(21) { animation-delay: 840ms; }
+.games-grid .game-card:nth-child(22) { animation-delay: 880ms; }
+.games-grid .game-card:nth-child(23) { animation-delay: 920ms; }
+.games-grid .game-card:nth-child(24) { animation-delay: 960ms; }
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .games-grid .game-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
