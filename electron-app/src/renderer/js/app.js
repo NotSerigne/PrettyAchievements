@@ -1285,10 +1285,14 @@ class PrettyAchievementsUI {
 
     // Déclenche une notification de test (Toast HTML/CSS custom)
     triggerTestNotification() {
-        if (typeof window.showNotification === 'function') {
-            // Transmet la position sélectionnée
-            const pos = localStorage.getItem('notifyPosition') || 'bottom-right';
-            window.showNotification('Ceci est une notification de test !', 3500, pos);
+        // Transmet la position sélectionnée
+        const pos = localStorage.getItem('notifyPosition') || 'bottom-right';
+        const message = 'Ceci est une notification de test !';
+        const duration = 3500;
+        if (window.electronAPI?.send) {
+            window.electronAPI.send('show-custom-notification', { message, duration, position: pos });
+        } else if (typeof window.showNotification === 'function') {
+            window.showNotification(message, duration, pos);
         } else {
             const feedback = document.getElementById('testNotificationFeedback');
             if (feedback) {

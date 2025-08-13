@@ -72,3 +72,19 @@ body {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 0.98; transform: translateY(0); }
 }
+@keyframes pa-slide-right {
+    from { opacity: 0; transform: translateX(-40px); }
+    to { opacity: 0.98; transform: translateX(0); }
+}
+@keyframes pa-slide-left {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 0.98; transform: translateX(0); }
+}
+@keyframes pa-slide-up {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 0.98; transform: translateY(0); }
+}
+@keyframes pa-slide-down {
+    from { opacity: 0; transform: translateY(-40px); }
+    to { opacity: 0.98; transform: translateY(0); }
+}

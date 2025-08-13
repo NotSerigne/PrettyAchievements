@@ -287,3 +287,27 @@ ipcMain.handle('config/load', async () => {
         return {};
     }
 });
+ipcMain.handle('config/saveNotifyPosition', async (_event, { position }) => {
+    try {
+        const target = path.resolve(__dirname, 'config.json');
+        let config = {};
+        if (fs.existsSync(target)) {
+            config = JSON.parse(fs.readFileSync(target, 'utf-8'));
+        }
+        config.notificationPosition = position;
+        fs.writeFileSync(target, JSON.stringify(config, null, 2), 'utf-8');
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: String(err) };
+    }
+});
+ipcMain.handle('config/loadNotifyPosition', async () => {
+    try {
+        const target = path.resolve(__dirname, 'config.json');
+        if (!fs.existsSync(target)) return { position: 'top-right' };
+        const config = JSON.parse(fs.readFileSync(target, 'utf-8'));
+        return { position: config.notificationPosition || 'top-right' };
+    } catch (err) {
+        return { position: 'top-right' };
+    }
+});
