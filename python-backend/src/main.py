@@ -3,7 +3,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sys
 import os
-
+from log_manager import get_logger
+logger = get_logger(__name__)
 
 
 
@@ -61,6 +62,7 @@ def get_games():
         })
 
     except Exception as e:
+        logger.error(f"Erreur dans /api/games : {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -93,16 +95,15 @@ def get_game_achievements(app_id):
         local_progress = {}
         if app_id in achievement_parser.achievement_files:
             file_path = achievement_parser.achievement_files[app_id]
-            local_achievements = achievement_parser.parse_achievement_file(file_path)
-            local_progress = {ach['name']: ach for ach in local_achievements}
-
+            local_achievements = achievement_parser.parse_achievement_file(file_path, app_id)
+            local_progress = {ach_id: ach_data for ach_id, ach_data in local_achievements.items()}
         # Format achievements for frontend
         formatted_achievements = []
 
         for ach_key, ach_data in achievements.items():
             # Check if unlocked locally
             is_unlocked = ach_key in local_progress
-            unlock_time = local_progress.get(ach_key, {}).get('unlocked_time', None)
+            unlock_time = local_progress.get(ach_key, {}).get('earned_time', None)
 
             # Filter based on parameters
             if not include_unlocked and is_unlocked:
@@ -154,6 +155,7 @@ def get_game_achievements(app_id):
         })
 
     except Exception as e:
+        logger.error(f"Erreur dans /api/games/<app_id>/achievements : {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -213,6 +215,7 @@ def get_game_stats(app_id):
             }
         })
     except Exception as e:
+        logger.error(f"Erreur dans /api/games/<app_id>/stats : {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -232,6 +235,7 @@ def get_cache_stats():
             'cache': stats
         })
     except Exception as e:
+        logger.error(f"Erreur dans /api/system/cache (GET) : {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -251,6 +255,7 @@ def clear_cache():
             'message': 'Cache cleared successfully'
         })
     except Exception as e:
+        logger.error(f"Erreur dans /api/system/cache (DELETE) : {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -280,5 +285,6 @@ if __name__ == '__main__':
     print("   GET  /api/system/cache              - Get cache statistics")
     print("   DELETE /api/system/cache            - Clear cache")
     print("\n🌐 Server running on http://localhost:5000")
+    logger.info("API démarrée sur http://localhost:5000")
 
     app.run(debug=True, host='localhost', port=5000)
