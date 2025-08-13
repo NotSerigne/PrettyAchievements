@@ -22,8 +22,15 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
-    /* Correction : autoriser le scroll vertical */
-    overflow-y: auto;
+    /* Correction : masquer toutes les scrollbars */
+    overflow-y: scroll; /* Toujours permettre le scroll, mais masquer la scrollbar */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
+}
+
+body::-webkit-scrollbar {
+    width: 0 !important;
+    display: none !important;
 }
 
 :focus {
@@ -364,6 +371,8 @@ body {
 
 .main-content.sidebar-open {
     margin-left: 0;
+    /* Cache la scrollbar de la page jeu */
+    overflow-y: hidden;
 }
 
 .content-section {
@@ -424,6 +433,18 @@ body {
     font-weight: 700;
     color: var(--primary-color);
     margin-bottom: 10px;
+}
+
+.stat-number.rollup {
+    animation: rollup-number 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: text-shadow, color;
+    text-shadow: 0 2px 12px #679cdf44;
+    color: var(--primary-color);
+}
+@keyframes rollup-number {
+    0% { color: #fffbe6; text-shadow: 0 2px 12px #ffe06699; }
+    60% { color: #679CDF; text-shadow: 0 2px 12px #679cdf44; }
+    100% { color: var(--primary-color); text-shadow: 0 2px 12px #679cdf44; }
 }
 
 /* ===== GAMES GRID AVEC IMAGES STEAM ===== */
@@ -671,6 +692,24 @@ body {
     color: var(--text-secondary);
     font-size: 0.9rem;
     line-height: 1.4;
+}
+
+/* ===== ACHIEVEMENTS GLOW & GRAY ===== */
+.achievement-icon-gray {
+    filter: grayscale(1) brightness(0.6) contrast(1.1) !important;
+    opacity: 0.6 !important;
+}
+.ultra-rare-gold-glow {
+    box-shadow: 0 0 0 2px #ffe066, 0 0 6px 2px #ffe06699, 0 0 12px 4px #fffbe6cc;
+    border: 1.5px solid #ffe066 !important;
+    background: linear-gradient(135deg, #fffbe6 70%, #ffe066 100%) !important;
+    z-index: 2;
+    position: relative;
+    animation: ultra-rare-glow 1.5s infinite alternate;
+}
+@keyframes ultra-rare-glow {
+    0% { box-shadow: 0 0 0 2px #ffe066, 0 0 6px 2px #ffe06699, 0 0 12px 4px #fffbe6cc; }
+    100% { box-shadow: 0 0 0 3px #ffe066, 0 0 12px 4px #ffe06699, 0 0 24px 8px #fffbe6cc; }
 }
 
 /* ===== SETTINGS AVEC TOGGLE SWITCHES ===== */
@@ -1066,27 +1105,6 @@ body {
     background: var(--primary-dark);
 }
 
-/* ===== SCROLLBAR ===== */
-.menu-content::-webkit-scrollbar,
-.sidebar::-webkit-scrollbar {
-    width: 6px;
-}
-
-.menu-content::-webkit-scrollbar-track,
-.sidebar::-webkit-scrollbar-track {
-    background-color: #2a2a2a;
-}
-
-.menu-content::-webkit-scrollbar-thumb,
-.sidebar::-webkit-scrollbar-thumb {
-    background-color: var(--hover-bg);
-    border-radius: 3px;
-}
-
-.menu-content::-webkit-scrollbar-thumb:hover,
-.sidebar::-webkit-scrollbar-thumb:hover {
-    background-color: #555555;
-}
 
 /* ===== LOADING & ERROR STATES ===== */
 .loading {
@@ -1233,6 +1251,40 @@ body {
     text-overflow: ellipsis;
 }
 
+/* ===== GAME DETAILS BACK BUTTON ===== */
+.game-details-back-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1002;
+    background: #679CDF;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(103, 156, 223, 0.3);
+    color: white;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.game-details-back-btn:hover {
+    background: #5a8bc7;
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(103, 156, 223, 0.4);
+}
+
+.game-details-back-btn:active {
+    transform: scale(0.95);
+}
+
 /* ===== RESCAN ICON (top-right) ===== */
 .rescan-menu {
     position: fixed;
@@ -1370,4 +1422,28 @@ body {
     opacity: 1 !important;
     transform: none !important;
   }
+}
+
+body, .main-content, .settings-container, .menu-main-section, .menu-content {
+    /* Masquer toutes les scrollbars verticales mais permettre le scroll */
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE 10+ */
+}
+body::-webkit-scrollbar,
+.main-content::-webkit-scrollbar,
+.settings-container::-webkit-scrollbar,
+.menu-main-section::-webkit-scrollbar,
+.menu-content::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    display: none !important;
+}
+
+/* Pour Electron/Chromium, forcer le style sur tous les éléments scrollables */
+::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    display: none !important;
 }

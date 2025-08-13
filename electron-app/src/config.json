@@ -1,7 +1,7 @@
 {
   "general": {
     "autoStart": false,
-    "notifications": true,
+    "notifications": false,
     "minimizeToTray": false,
     "refreshEveryMinutes": 15,
     "steamApiKey": ""
@@ -15,7 +15,7 @@
     "folders": []
   },
   "cache": {
-    "autoRefreshCache": true,
+    "autoDeleteCache": false,
     "cacheDuration": 24
   }
 }

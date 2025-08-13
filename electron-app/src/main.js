@@ -349,3 +349,26 @@ ipcMain.handle('config/syncSteamApiKeyFromElectronConfig', async () => {
         return { ok: false, error: String(err) };
     }
 });
+
+// Handler IPC pour vider le cache JSON
+// ipcMain.handle('clear-cache-json', async () => {
+//     return new Promise((resolve, reject) => {
+//         const script = path.resolve(__dirname, '..', '..', 'python-backend', 'src', 'clear_cache.py');
+//         const py = process.platform === 'win32' ? 'python' : 'python3';
+//         const child = spawn(py, [script], {
+//             windowsHide: true,
+//             env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+//         });
+//         let stdout = '';
+//         let stderr = '';
+//         child.stdout.on('data', (d) => { stdout += d.toString(); });
+//         child.stderr.on('data', (d) => { stderr += d.toString(); });
+//         child.on('close', (code) => {
+//             if (code !== 0) {
+//                 return resolve({ success: false, error: stderr || 'Erreur inconnue' });
+//             }
+//             resolve({ success: true, output: stdout.trim() });
+//         });
+//         child.on('error', (err) => resolve({ success: false, error: err.message }));
+//     });
+// });

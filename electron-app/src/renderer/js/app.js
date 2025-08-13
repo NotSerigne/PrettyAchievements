@@ -166,6 +166,28 @@ class PrettyAchievementsUI {
         // ✅ EVENTS SETTINGS
         this.bindSettingsEvents();
         this.bindSaveSettings();
+
+        // Ajout : clic sur une carte de jeu (sidebar et page jeux)
+        document.addEventListener('click', (e) => {
+            const card = e.target.closest?.('.game-card');
+            if (card) {
+                // Cherche l'appId sur .game-card ou un enfant .game-card-inner
+                let appId = card.dataset?.appId;
+                if (!appId) {
+                    const inner = card.querySelector('.game-card-inner');
+                    appId = inner?.dataset?.appId;
+                }
+                if (appId) {
+                    // Trouve l'objet jeu correspondant
+                    const games = this.getDetectedGames();
+                    const game = games.find(g => String(g.steamAppId || g.appId || g.id) === String(appId));
+                    if (game) {
+                        this.showSection('gameDetails');
+                        this.showGameDetails(game);
+                    }
+                }
+            }
+        });
     }
 
     // ✅ GESTION SIDEBAR
@@ -302,8 +324,9 @@ class PrettyAchievementsUI {
 
         games = this.sortGames(games);
         games.forEach(game => {
-            const achievements = Number(game.achievements || 0);
-            const unlocked = Number(game.unlocked || 0);
+            // Correction : correspondance API Flask/main.py
+            const achievements = Number(game.total_obtenable_achievements ?? game.achievements ?? 0);
+            const unlocked = Number(game.local_achievements_count ?? game.unlocked ?? 0);
             const progress = achievements > 0 ? Math.round((unlocked / achievements) * 100) : 0;
             const gameCard = document.createElement('div');
             gameCard.className = 'game-card';
@@ -311,6 +334,7 @@ class PrettyAchievementsUI {
             gamesGrid.appendChild(gameCard);
         });
         this.applyStaggerAnimation();
+        this.hideGamesLoading(true);
     }
 
     renderDetectedCrackedGames() {
@@ -346,8 +370,9 @@ class PrettyAchievementsUI {
             (gamesArray || []).forEach(g => {
                 const appId = String(g.app_id ?? g.id ?? '').trim();
                 if (!appId) return;
-                const achievements = Number(g.local_achievements_count || g.totalAchievements || 0) || 0;
-                const unlocked = Number(g.unlocked || 0) || 0;
+                // Correction mapping : achievements = total_obtenable_achievements, unlocked = local_achievements_count
+                const achievements = Number(g.total_obtenable_achievements || g.achievements || 0) || 0;
+                const unlocked = Number(g.local_achievements_count || g.unlocked || 0) || 0;
                 out[appId] = {
                     name: String(g.name || `App ${appId}`),
                     achievements,
@@ -564,9 +589,15 @@ class PrettyAchievementsUI {
             container.addEventListener('click', (e) => {
                 const card = e.target.closest?.('.game-card');
                 if (!card) return;
-                // Ouvrir la page Jeux sans relancer un scan
-                this.skipNextGamesScan = true;
+                // Récupérer l'appId ou id depuis l'attribut data-app-id
+                const appId = card.getAttribute('data-app-id');
+                if (!appId) return;
+                // Chercher le jeu correspondant dans la liste des jeux
+                const game = games.find(g => String(g.steamAppId || g.appId || g.id) === appId);
+                if (!game) return;
+                // Ouvrir la page de détails du jeu
                 this.showSection('games');
+                this.showGameDetails(game);
             });
             container._sgClickBound = true;
         }
@@ -655,7 +686,6 @@ class PrettyAchievementsUI {
         const logoCandidate = appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/logo.png` : '';
 
         if (enableImages && appId) {
-            // Afficher le logo uniquement si le mode n'est pas "Header"
             if (quality !== 'medium') {
                 logoUrl = logoCandidate;
             } else {
@@ -670,7 +700,6 @@ class PrettyAchievementsUI {
             }
         }
 
-        // Debug: print logo URL for each game
         if (logoCandidate) {
             try { console.log(`[DEBUG] Logo URL for ${name} [${appId}]: ${logoCandidate}`); } catch (_) {}
         }
@@ -679,80 +708,97 @@ class PrettyAchievementsUI {
         const unlocked = Number(game.unlocked || 0);
         const countHtml = `<div class="achievement-count">${unlocked}/${achievements}</div>`;
 
+        // Ajout de l'attribut data-app-id sur le conteneur principal
         return `
-          <div class="game-card-header ${headerUrl ? '' : 'no-image'}">
-            ${headerUrl ? `<img src="${headerUrl}" alt="${this.escapeHtml(name)}" onload="this.classList.add('loaded')" referrerpolicy="no-referrer">` : ''}
-            ${logoUrl ? `<img class=\"game-logo\" src=\"${logoUrl}\" alt=\"${this.escapeHtml(name)}\" referrerpolicy=\"no-referrer\" onerror=\"this.remove()\" onload=\"var f=this.nextElementSibling; if(f&&f.classList.contains('game-title-fallback')) f.style.display='none';\">` : ''}
-            <div class=\"game-title-fallback\">${this.escapeHtml(name)}</div>
-          </div>
-          <div class="game-card-body">
-            <div class="game-name">${this.escapeHtml(name)}</div>
-            <div class="game-progress-container">
-              ${countHtml}
-              <div class="progress-bar"><div class="progress" style="width:${progress}%"></div></div>
-              <div class="progress-text">${progress}% complété</div>
+          <div class="game-card-inner" data-app-id="${appId}">
+            <div class="game-card-header ${headerUrl ? '' : 'no-image'}">
+              ${headerUrl ? `<img src="${headerUrl}" alt="${this.escapeHtml(name)}" onload="this.classList.add('loaded')" referrerpolicy="no-referrer">` : ''}
+              ${logoUrl ? `<img class=\"game-logo\" src=\"${logoUrl}\" alt=\"${this.escapeHtml(name)}\" referrerpolicy=\"no-referrer\" onerror=\"this.remove()\" onload=\"var f=this.nextElementSibling; if(f&&f.classList.contains('game-title-fallback')) f.style.display='none';\">` : ''}
+              <div class=\"game-title-fallback\">${this.escapeHtml(name)}</div>
+            </div>
+            <div class="game-card-body">
+              <div class="game-name">${this.escapeHtml(name)}</div>
+              <div class="game-progress-container">
+                ${countHtml}
+                <div class="progress-bar"><div class="progress" style="width:${progress}%"></div></div>
+                <div class="progress-text">${progress}% complété</div>
+              </div>
             </div>
           </div>
         `;
     }
     async loadDashboard() {
         try {
-            // 1) Supprimer la carte "Succès Totaux" si présente
-            const totalAchEl = document.getElementById('totalAchievements');
-            if (totalAchEl) {
-                const card = totalAchEl.closest('.stat-card');
-                if (card && card.parentNode) card.parentNode.removeChild(card);
-            }
-
-            // 2) Renommer la carte de complétion
-            const completionEl = document.getElementById('completionRate');
-            if (completionEl) {
-                const compCard = completionEl.closest('.stat-card');
-                const header = compCard?.querySelector('h3');
-                if (header) header.textContent = 'Taux de Complétion Moyen';
-            }
-
-            // 3) Récupérer total_games depuis l'API backend
-            const totalGamesEl = document.getElementById('totalGames');
-            let totalGamesVal = null;
-            try {
-                const res = await fetch('http://localhost:5000/api/games', { method: 'GET' });
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json && json.success && Number.isFinite(json.total_games)) {
-                        totalGamesVal = json.total_games;
-                    }
-                }
-            } catch (_) { /* ignore, fallback below */ }
-
-            // 4) Calcul des métriques locales à partir des jeux détectés
-            const games = this.getDetectedGames();
-            const fallbackTotal = Array.isArray(games) ? games.length : 0;
-            if (totalGamesEl) {
-                const target = Number(totalGamesVal ?? fallbackTotal) || 0;
-                this.animateCounter(totalGamesEl, target, 900);
-            }
-
+            const dashboardEl = document.getElementById('dashboard');
+            if (!dashboardEl) return;
+            // Récupérer les stats globales via l'API backend
+            const res = await fetch('http://localhost:5000/api/games');
+            const json = await res.json();
+            let totalGames = 0;
             let sumUnlocked = 0;
-            let sumRatio = 0;
-            let countWithAchievements = 0;
-            for (const g of games) {
-                const a = Number(g.achievements || 0);
-                const u = Number(g.unlocked || 0);
-                sumUnlocked += Number.isFinite(u) ? u : 0;
-                if (a > 0) {
-                    sumRatio += Math.max(0, Math.min(1, u / a));
-                    countWithAchievements += 1;
+            let sumTotal = 0;
+            let completionRate = 0;
+            if (json && json.success) {
+                totalGames = json.total_games || 0;
+                if (Array.isArray(json.games)) {
+                    sumUnlocked = json.games.reduce((acc, g) => acc + (Number(g.local_achievements_count) || 0), 0);
+                    sumTotal = json.games.reduce((acc, g) => acc + (Number(g.total_obtenable_achievements) || 0), 0);
+                }
+                if (sumTotal > 0) {
+                    completionRate = (sumUnlocked / sumTotal) * 100;
                 }
             }
-            // Total succès débloqués
-            const unlockedEl = document.getElementById('unlockedAchievements');
-            if (unlockedEl) unlockedEl.textContent = String(sumUnlocked);
-
-            // Taux de complétion moyen (en %)
-            const avg = countWithAchievements > 0 ? (sumRatio / countWithAchievements) * 100 : 0;
-            if (completionEl) completionEl.textContent = `${Math.round(avg)}%`;
-        } catch (_) { /* ignore dashboard errors */ }
+            // Affichage dynamique
+            dashboardEl.innerHTML = `
+                <h1>Tableau de bord</h1>
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <h3>Jeux détectés</h3>
+                        <div class="stat-number rollup" id="totalGames">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Succès débloqués</h3>
+                        <div class="stat-number rollup" id="unlockedAchievements">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Taux de complétion moyen</h3>
+                        <div class="stat-number rollup" id="completionRate">0%</div>
+                    </div>
+                </div>
+                ${totalGames === 0 ? `<div class='no-results'><h3>Aucun jeu détecté</h3><p>Ajoutez des dossiers à scanner dans les réglages.</p></div>` : ''}
+            `;
+            // Animation rollup JS
+            this.animateRollup('totalGames', totalGames, 1.2, false);
+            this.animateRollup('unlockedAchievements', sumUnlocked, 1.2, false);
+            this.animateRollup('completionRate', completionRate, 1.2, true);
+        } catch (e) {
+            const dashboardEl = document.getElementById('dashboard');
+            if (dashboardEl) dashboardEl.innerHTML = `<div class='error-message'>Erreur chargement du tableau de bord : ${this.escapeHtml(e.message)}</div>`;
+        }
+    }
+    animateRollup(id, target, duration = 1.2, percent = false) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const start = 0;
+        const end = Number(target);
+        const frameRate = 60;
+        const totalFrames = Math.round(duration * frameRate);
+        let frame = 0;
+        function animate() {
+            frame++;
+            let val = start + (end - start) * (frame / totalFrames);
+            if (percent) {
+                el.textContent = `${val.toFixed(1)}%`;
+            } else {
+                el.textContent = Math.round(val);
+            }
+            if (frame < totalFrames) {
+                requestAnimationFrame(animate);
+            } else {
+                el.textContent = percent ? `${end.toFixed(1)}%` : end;
+            }
+        }
+        animate();
     }
     loadAchievements() { /* ... votre code achievements ... */ }
     loadStatistics() { /* ... votre code stats ... */ }
@@ -1120,7 +1166,7 @@ class PrettyAchievementsUI {
                 folders: Array.from(document.querySelectorAll('#addedScanFolders .folder-path strong')).map(el => el.textContent)
             },
             cache: {
-                autoRefreshCache: getBool('autoRefreshCache'),
+                autoDeleteCache: getBool('autoDeleteCache'),
                 cacheDuration: getNum('cacheDuration', 24)
             }
         };
@@ -1267,8 +1313,8 @@ class PrettyAchievementsUI {
             setVal('imageCacheDuration', cfg?.images?.imageCacheDuration);
             // general extra
             setVal('refreshEveryMinutes', cfg?.general?.refreshEveryMinutes);
-            // cache
-            setBool('autoRefreshCache', cfg?.cache?.autoRefreshCache);
+            // cache*
+            setBool('autoDeleteCache', cfg?.cache?.autoDeleteCache);
             setVal('cacheDuration', cfg?.cache?.cacheDuration);
             // detection folders
             if (Array.isArray(cfg?.detection?.folders)) {
@@ -1376,7 +1422,6 @@ class PrettyAchievementsUI {
 
     // Déclenche une notification de test (Toast HTML/CSS custom)
     triggerTestNotification() {
-        // Transmet la position sélectionnée
         const pos = localStorage.getItem('notifyPosition') || 'bottom-right';
         const message = 'Ceci est une notification de test !';
         const duration = 3500;
@@ -1424,6 +1469,226 @@ class PrettyAchievementsUI {
                 }, 3000);
             }
         }
+    }
+
+    showGameDetails(game) {
+        // Masquer toutes les sections
+        this.contentSections.forEach(section => section.classList.remove('active'));
+        // Afficher la section détails
+        const detailsSection = document.getElementById('gameDetails');
+        if (!detailsSection) return;
+        detailsSection.style.display = '';
+        detailsSection.classList.add('active');
+
+        // Ajout du bouton retour (en haut à droite, style spécifique)
+        let backBtn = document.getElementById('gameDetailsBackBtn');
+        if (!backBtn) {
+            backBtn = document.createElement('button');
+            backBtn.id = 'gameDetailsBackBtn';
+            backBtn.className = 'game-details-back-btn';
+            backBtn.title = 'Retour';
+            backBtn.innerHTML = '←';
+            backBtn.onclick = () => {
+                this.showSection('games');
+            };
+            detailsSection.style.position = 'relative';
+            detailsSection.appendChild(backBtn);
+        }
+
+        // Header : logo à gauche en grand, header du jeu en fond
+        const appId = game.steamAppId || game.appId || game.id;
+        const headerUrl = appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_hero.jpg` : '';
+        const logoUrl = appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/logo.png` : '';
+        const achievements = Number(game.achievements || 0);
+        const unlocked = Number(game.unlocked || 0);
+        const progress = achievements > 0 ? Math.round((unlocked / achievements) * 100) : 0;
+        const header = document.getElementById('gameDetailsHeader');
+        if (header) {
+            header.innerHTML = `
+                <div class="game-details-hero" style="background:url('${headerUrl}') center/cover no-repeat;min-height:220px;display:flex;align-items:center;gap:32px;padding:32px 24px 24px 32px;position:relative;">
+                    <img src="${logoUrl}" alt="logo" style="width:180px;height:180px;object-fit:contain;">
+                    <div style="flex:1;">
+                        <div class="completion-bar-container" style="margin-bottom:12px;">
+                            <div style="font-weight:600;font-size:1.1em;margin-bottom:4px;">Complétion&nbsp;: ${progress}%</div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <div style="flex:1;height:12px;background:#222;border-radius:6px;overflow:hidden;">
+                                    <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#679CDF,#5489CC);transition:width 0.3s;"></div>
+                                </div>
+                                <div style="font-weight:700;color:var(--primary-color);">${unlocked}/${achievements}</div>
+                            </div>
+                        </div>
+                        <div style="font-size:1.3em;font-weight:700;">${this.escapeHtml(game.name)}</div>
+                    </div>
+                </div>
+            `;
+        }
+        // Loader temporaire
+        const achContainer = document.getElementById('gameDetailsAchievements');
+        if (achContainer) {
+            achContainer.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-secondary);">Chargement des succès...</div>';
+        }
+        // Ajout du bouton de tri pour chaque liste (débloqués et non débloqués)
+        // Déplacer sortState en dehors de renderAchievementsLists pour conserver l'état
+        let sortState = {
+            unlocked: { type: 'percentage', order: 'desc' },
+            locked: { type: 'percentage', order: 'desc' }
+        };
+        const sortOptions = [
+            { type: 'name', order: 'asc', label: 'A→Z' },
+            { type: 'name', order: 'desc', label: 'Z→A' },
+            { type: 'percentage', order: 'desc', label: '%↓' },
+            { type: 'percentage', order: 'asc', label: '%↑' },
+            { type: 'unlock_time', order: 'desc', label: 'Date↓' },
+            { type: 'unlock_time', order: 'asc', label: 'Date↑' }
+        ];
+        function getSortLabel(type, order) {
+            const found = sortOptions.find(opt => opt.type === type && opt.order === order);
+            return found ? found.label : '?';
+        }
+        function sortAchievements(arr, type, order) {
+            let sorted = arr.slice();
+            if (type === 'name') {
+                sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            } else if (type === 'percentage') {
+                sorted.sort((a, b) => (a.percentage || 0) - (b.percentage || 0));
+            } else if (type === 'unlock_time') {
+                sorted.sort((a, b) => (a.earned_time || a.unlock_time || 0) - (b.earned_time || b.unlock_time || 0));
+            }
+            if (order === 'desc') sorted.reverse();
+            return sorted;
+        }
+        function nextSortOption(currentType, currentOrder) {
+            const idx = sortOptions.findIndex(opt => opt.type === currentType && opt.order === currentOrder);
+            return sortOptions[(idx + 1) % sortOptions.length];
+        }
+        function renderAchievementsLists(achievements) {
+            const unlocked = achievements.filter(a => a.unlocked);
+            const locked = achievements.filter(a => !a.unlocked);
+            achContainer.innerHTML = `
+                <div class="ach-list-group">
+                    <div class="ach-list-header" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:1.2rem;font-weight:600;" data-toggle="unlocked">
+                        <span style="font-size:1.3em;">🏆</span> <span>Débloqués (${unlocked.length})</span> <span class="ach-list-arrow" style="margin-left:auto;">▼</span>
+                        <button class="ach-sort-btn" id="achSortUnlockedBtn" style="margin-left:8px;padding:2px 10px;border-radius:6px;border:none;background:var(--primary-color);color:#fff;cursor:pointer;font-size:0.95em;">${getSortLabel(sortState.unlocked.type, sortState.unlocked.order)}</button>
+                    </div>
+                    <div class="ach-list" id="achListUnlocked">
+                        ${sortAchievements(unlocked, sortState.unlocked.type, sortState.unlocked.order).map(a => this.renderAchievementRow(a)).join('') || '<div style="color:var(--text-secondary);padding:8px;">Aucun succès débloqué</div>'}
+                    </div>
+                </div>
+                <div class="ach-list-group">
+                    <div class="ach-list-header" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:1.2rem;font-weight:600;" data-toggle="locked">
+                        <span style="font-size:1.3em;">🔒</span> <span>Non débloqués (${locked.length})</span> <span class="ach-list-arrow" style="margin-left:auto;">▼</span>
+                        <button class="ach-sort-btn" id="achSortLockedBtn" style="margin-left:8px;padding:2px 10px;border-radius:6px;border:none;background:var(--primary-color);color:#fff;cursor:pointer;font-size:0.95em;">${getSortLabel(sortState.locked.type, sortState.locked.order)}</button>
+                    </div>
+                    <div class="ach-list" id="achListLocked">
+                        ${sortAchievements(locked, sortState.locked.type, sortState.locked.order).map(a => this.renderAchievementRow(a)).join('') || '<div style="color:var(--text-secondary);padding:8px;">Tous les succès sont débloqués !</div>'}
+                    </div>
+                </div>
+            `;
+            // Ajout du toggle (réduction)
+            achContainer.querySelectorAll('.ach-list-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    // Correction : ne réduire que si le clic est sur le header lui-même, pas sur un enfant (bouton)
+                    if (e.target.closest('.ach-sort-btn')) return; // Ne pas réduire si clic sur tri ou sur le bouton
+                    // Correction : autoriser la réduction si le clic est sur le header ou sur un enfant direct (span, etc.)
+                    if (e.target !== header && !header.contains(e.target)) return;
+                    const type = header.getAttribute('data-toggle');
+                    const list = achContainer.querySelector(`#achList${type.charAt(0).toUpperCase() + type.slice(1)}`);
+                    if (list) {
+                        const isOpen = list.style.display !== 'none';
+                        list.style.display = isOpen ? 'none' : '';
+                        header.querySelector('.ach-list-arrow').textContent = isOpen ? '►' : '▼';
+                    }
+                });
+            });
+            // Ajout listeners tri
+            ['unlocked', 'locked'].forEach(type => {
+                const btn = achContainer.querySelector(`#achSort${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // Cycle les 6 options
+                        const current = sortState[type];
+                        const next = nextSortOption(current.type, current.order);
+                        sortState[type] = { type: next.type, order: next.order };
+                        btn.textContent = next.label;
+                        renderAchievementsLists.call(this, achievements);
+                    });
+                }
+            });
+        }
+        // Récupère les succès via l'API backend (endpoint /achievements)
+        Promise.all([
+            fetch(`http://localhost:5000/api/games/${appId}/achievements`).then(res => res.json()),
+            fetch(`http://localhost:5000/api/games/${appId}/stats`).then(res => res.json())
+        ]).then(([achievementsRes, statsRes]) => {
+            if (!achievementsRes.success) throw new Error(achievementsRes.error || 'Erreur API achievements');
+            if (!statsRes.success) throw new Error(statsRes.error || 'Erreur API stats');
+            // Map des succès débloqués
+            const completed = statsRes.stats?.completed_achievements || {};
+            // Liste des succès avec nom, description, % et statut débloqué
+            const achievements = (achievementsRes.achievements || []).map(ach => {
+                const unlocked = completed[ach.key]?.earned === true;
+                return {
+                    ...ach,
+                    unlocked,
+                    earned: unlocked,
+                    earned_time: completed[ach.key]?.earned_time || ach.unlock_time || null
+                };
+            });
+            renderAchievementsLists.call(this, achievements);
+        }).catch(err => {
+            if (achContainer) achContainer.innerHTML = `<div style='color:var(--text-secondary);padding:32px;text-align:center;'>Erreur chargement succès : ${this.escapeHtml(err.message)}</div>`;
+        });
+    }
+
+    renderAchievementRow(a) {
+        // Affiche une ligne de succès (icône, nom, description, rareté, etc.)
+        const icon = a.icon || a.icon_gray || '';
+        // Utilise le pourcentage de complétion pour l'icône
+        let rarity = '';
+        let rarityIcon = '';
+        let rarityLabel = '';
+        let pct = typeof a.percentage === 'number' ? a.percentage : 0;
+        let glowClass = '';
+        if (pct > 50) {
+            rarityIcon = '🟢'; rarityLabel = 'Commun';
+        } else if (pct > 20) {
+            rarityIcon = '🔵'; rarityLabel = 'Peu commun';
+        } else if (pct > 5) {
+            rarityIcon = '🟣'; rarityLabel = 'Rare';
+        } else if (pct > 1) {
+            rarityIcon = '🔴'; rarityLabel = 'Très rare';
+        } else {
+            rarityIcon = '🟡'; rarityLabel = 'Ultra rare';
+            glowClass = 'ultra-rare-gold-glow'; // Glow doré pour ultra rare
+        }
+        rarity = `${rarityIcon} ${(pct || 0).toFixed(1)}%`;
+        // Déterminer si le succès est débloqué
+        const unlocked = a.unlocked === true || a.earned === true;
+        // Ajout des classes CSS pour glow et image grisée
+        let iconClass = '';
+        if (!unlocked) iconClass += ' achievement-icon-gray'; // Image grise si pas débloqué
+        // Ajout date de déblocage si dispo
+        let unlockDateHtml = '';
+        if (unlocked && a.unlock_time) {
+            const date = new Date(a.unlock_time * 1000);
+            const dateStr = date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            unlockDateHtml = `<div style="color:var(--text-secondary);font-size:0.92em;margin-top:2px;">Débloqué le ${dateStr}</div>`;
+        }
+        // Ajout du pourcentage de la commu à droite
+        return `<div class="achievement-row" style="display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid #333;">
+            <span class="achievement-icon-wrapper${glowClass ? ' ultra-rare-gold-glow' : ''}" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:7px;">
+                ${icon ? `<img src="${icon}" alt="icon" class="${iconClass.trim()}" style="width:38px;height:38px;border-radius:7px;background:#222;">` : '<span style="width:38px;height:38px;display:inline-block;"></span>'}
+            </span>
+            <div style="flex:1;">
+                <div style="font-weight:600;font-size:1.08em;">${this.escapeHtml(a.name)}</div>
+                <div style="color:var(--text-secondary);font-size:0.95em;">${this.escapeHtml(a.description || '')}</div>
+                ${unlockDateHtml}
+            </div>
+            <div style="font-size:0.95em;color:var(--primary-color);font-weight:500;white-space:nowrap;text-align:right;min-width:70px;">
+                <span>${rarity}</span>
+            </div>
+        </div>`;
     }
 }
 

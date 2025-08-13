@@ -23,20 +23,31 @@
   "known_locations": {
     "public_docs": {
       "base_path": "C:/Users/Public/Documents/Steam",
-      "teams": ["CODEX", "RUNE"]
+      "teams": [
+        "CODEX",
+        "RUNE"
+      ]
     },
     "appdata_roaming": {
       "base_path": "~/AppData/Roaming",
-      "teams": ["EMPRESS", "SmartSteamEmu", "Goldberg SteamEmu Saves", "CreamAPI"]
+      "teams": [
+        "EMPRESS",
+        "SmartSteamEmu",
+        "Goldberg SteamEmu Saves",
+        "CreamAPI"
+      ]
     },
     "appdata_local": {
       "base_path": "~/AppData/Local",
-      "teams": ["SKIDROW"]
+      "teams": [
+        "SKIDROW"
+      ]
     },
     "steam_appdata": {
       "base_path": "~/AppData/Roaming/Steam",
-      "teams": ["CODEX"]
+      "teams": [
+        "CODEX"
+      ]
     }
   }
 }
-

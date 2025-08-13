@@ -235,7 +235,12 @@ class AchievementParser:
         Returns:
             bool: True if achievement file found and registered, False otherwise
         """
-        if not game_path or not os.path.exists(game_path):
+        if not game_path or not isinstance(game_path, str) or not game_path.strip():
+            if self.verbose:
+                print(f"Game path is invalid or empty: {game_path}")
+            return False
+        game_path = os.path.abspath(game_path)
+        if not os.path.exists(game_path):
             if self.verbose:
                 print(f"Game path does not exist: {game_path}")
             return False
@@ -245,7 +250,10 @@ class AchievementParser:
 
         for filename in possible_files:
             file_path = os.path.join(game_path, filename)
-            if os.path.exists(file_path):
+            file_path = os.path.abspath(file_path)
+            try:
+                if not os.path.exists(file_path):
+                    continue
                 # Vérifier que le fichier n'est pas vide et est lisible
                 try:
                     if os.path.getsize(file_path) == 0:
@@ -276,6 +284,10 @@ class AchievementParser:
                     if self.verbose:
                         print(f"❌ Invalid achievement file {file_path}: {e}")
                     continue
+            except OSError as e:
+                if self.verbose:
+                    print(f"❌ OSError when checking file {file_path}: {e}")
+                continue
 
         if self.verbose:
             print(f"❌ No valid achievement files found for {game_id} in {game_path}")
