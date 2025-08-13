@@ -281,15 +281,22 @@ class AchievementParser:
             print(f"❌ No valid achievement files found for {game_id} in {game_path}")
         return False
 
-    def parse_achievement_file(self, file_path):
-        """Parse local achievement file (supports .json and .ini, et sections numériques)"""
+    def parse_achievement_file(self, file_path, app_id=None):
+        """Parse local achievement file (supports .json and .ini, et sections numériques)
+        Met en cache le résultat dans local_achievements si app_id fourni."""
         achievements = {}
+        cache_key = None
+        if app_id is not None:
+            cache_key = str(app_id)
+            cached = self.cache_manager.get_cache("local_achievements", cache_key)
+            if cached:
+                self.log_debug(f"Cache HIT for local achievements: {cache_key}")
+                return cached
         try:
             if file_path.endswith('.json'):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 for ach_id, ach_data in data.items():
-                    # On ignore les achievements non complétés
                     if not ach_data.get('earned', False):
                         continue
                     achievements[ach_id] = {
@@ -301,18 +308,19 @@ class AchievementParser:
                 config.read(file_path, encoding='utf-8')
                 for section in config.sections():
                     if section == 'SteamAchievements':
-                        continue  # On ignore la section globale
-                    # Si la section est un nombre, on considère que c'est un achievement
-                    if section.isdigit() or section.lower().startswith('ach') or 'achievement' in section.lower():
-                        achieved = config[section].get('Achieved')
-                        unlock_time = config[section].get('UnlockTime', 0)
-                        if achieved is not None:
-                            achievements[section] = {
-                                'earned': achieved == '1',
-                                'earned_time': int(unlock_time)
-                            }
+                        continue
+                    achieved = config[section].get('Achieved')
+                    unlock_time = config[section].get('UnlockTime', 0)
+                    if achieved is not None:
+                        achievements[section] = {
+                            'earned': achieved == '1',
+                            'earned_time': int(unlock_time)
+                        }
         except (configparser.Error, OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
             self.log_debug(f"Error parsing achievement file {file_path}: {e}")
+        # Mise en cache si app_id fourni
+        if cache_key is not None:
+            self.cache_manager.set_cache("local_achievements", cache_key, achievements, ttl=3600)
         return achievements
 
     def get_best_achievements_with_key(self, app_id, api_key):
@@ -498,3 +506,6 @@ class AchievementParser:
                 rarity_stats[rarity] += 1
         return rarity_stats
 
+test = AchievementParser()
+achievements = test.get_best_achievements_auto(250900)
+print(achievements)
