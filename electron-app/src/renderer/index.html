@@ -152,6 +152,13 @@
                         <span style="margin-left:8px;color:var(--text-secondary)">minutes</span>
                     </div>
                 </div>
+                <div class="setting-item">
+                    <label for="steamApiKey">Clé API Steam</label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input type="password" id="steamApiKey" autocomplete="off" style="flex:1;" />
+                        <button type="button" id="toggleApiKeyVisibility" style="background:none;border:none;cursor:pointer;font-size:1.2em;" tabindex="-1" title="Afficher/Masquer la clé"><span id="apiKeyEye">👁️</span></button>
+                    </div>
+                </div>
             </div>
             <div class="settings-group">
                 <h3>Notifications</h3>

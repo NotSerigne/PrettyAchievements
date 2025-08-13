@@ -3,7 +3,8 @@
     "autoStart": false,
     "notifications": true,
     "minimizeToTray": false,
-    "refreshEveryMinutes": 15
+    "refreshEveryMinutes": 15,
+    "steamApiKey": ""
   },
   "images": {
     "enableSteamImages": true,

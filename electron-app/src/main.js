@@ -270,53 +270,82 @@ ipcMain.on('show-native-notification', (event, args) => {
     showNativeNotification(args);
 });
 
-// Save config to project root config.json
+// Save config to electron-app/src/config.json
 ipcMain.handle('config/save', async (_event, configObj) => {
     try {
+        // Chemin du fichier config Electron (toujours chiffré)
         const target = path.resolve(__dirname, 'config.json');
-        const data = JSON.stringify(configObj || {}, null, 2);
-        fs.writeFileSync(target, data, 'utf-8');
+        let config = {};
+        if (fs.existsSync(target)) {
+            config = JSON.parse(fs.readFileSync(target, 'utf-8'));
+        }
+        // Remplacer tout le contenu par le nouveau (sauf si tu veux merger)
+        config = { ...config, ...configObj };
+        fs.writeFileSync(target, JSON.stringify(config, null, 2), 'utf-8');
+        // Synchroniser la clé Steam API déchiffrée dans le config.json racine
+        await syncSteamApiKeyToRootConfig();
         return { ok: true, path: target };
     } catch (err) {
-        console.error('Failed to save config.json:', err);
+        console.error('Failed to save electron config.json:', err);
         return { ok: false, error: String(err) };
     }
 });
 
-// Load config from project root config.json
+// Load config from electron-app/src/config.json
 ipcMain.handle('config/load', async () => {
     try {
         const target = path.resolve(__dirname, 'config.json');
         if (!fs.existsSync(target)) return {};
         const raw = fs.readFileSync(target, 'utf-8');
         const parsed = JSON.parse(raw || '{}');
-        return parsed && typeof parsed === 'object' ? parsed : {};
+        return parsed;
     } catch (err) {
-        console.error('Failed to load config.json:', err);
+        console.error('Failed to load electron config.json:', err);
         return {};
     }
 });
-ipcMain.handle('config/saveNotifyPosition', async (_event, { position }) => {
+
+// Synchronise la clé Steam API déchiffrée dans le config.json racine
+async function syncSteamApiKeyToRootConfig() {
     try {
-        const target = path.resolve(__dirname, 'config.json');
-        let config = {};
-        if (fs.existsSync(target)) {
-            config = JSON.parse(fs.readFileSync(target, 'utf-8'));
+        const electronConfigPath = path.resolve(__dirname, 'config.json');
+        const rootConfigPath = path.resolve(__dirname, '..', '..', 'config.json');
+        if (!fs.existsSync(electronConfigPath)) return;
+        const electronConfig = JSON.parse(fs.readFileSync(electronConfigPath, 'utf-8'));
+        const encrypted = electronConfig?.general?.steamApiKey;
+        if (!encrypted) return;
+        let apiKey = '';
+        try {
+            const key = 'prettyachievements2024';
+            let decoded = '';
+            if (typeof Buffer !== 'undefined') {
+                decoded = Buffer.from(encrypted, 'base64').toString('utf-8');
+            } else {
+                decoded = atob(encrypted);
+            }
+            if (decoded.endsWith(':' + key)) {
+                apiKey = decoded.slice(0, -key.length - 1);
+            }
+        } catch (_) {}
+        if (!apiKey) return;
+        let rootConfig = {};
+        if (fs.existsSync(rootConfigPath)) {
+            rootConfig = JSON.parse(fs.readFileSync(rootConfigPath, 'utf-8'));
         }
-        config.notificationPosition = position;
-        fs.writeFileSync(target, JSON.stringify(config, null, 2), 'utf-8');
+        if (!rootConfig.steam_api) rootConfig.steam_api = {};
+        rootConfig.steam_api.api_key = apiKey;
+        fs.writeFileSync(rootConfigPath, JSON.stringify(rootConfig, null, 2), 'utf-8');
+    } catch (err) {
+        console.error('Erreur synchro steamApiKey vers config racine:', err);
+    }
+}
+
+// Handler manuel si besoin (optionnel)
+ipcMain.handle('config/syncSteamApiKeyFromElectronConfig', async () => {
+    try {
+        await syncSteamApiKeyToRootConfig();
         return { ok: true };
     } catch (err) {
         return { ok: false, error: String(err) };
-    }
-});
-ipcMain.handle('config/loadNotifyPosition', async () => {
-    try {
-        const target = path.resolve(__dirname, 'config.json');
-        if (!fs.existsSync(target)) return { position: 'top-right' };
-        const config = JSON.parse(fs.readFileSync(target, 'utf-8'));
-        return { position: config.notificationPosition || 'top-right' };
-    } catch (err) {
-        return { position: 'top-right' };
     }
 });

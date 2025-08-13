@@ -8,3 +8,9 @@ electron-app/node_modules/
 
 # JetBrains
 .idea/
+
+# Qodo
+.qodo/
+
+# Config
+config.json
