@@ -223,65 +223,96 @@ class AchievementParser:
         self.log_debug(f"Fetched and cached {len(combined)} gratuit achievements for {app_id}")
         return combined
 
-    def check_achievements_file(self, game_path, app_id):
-        """Check for local achievement files with caching"""
-        cache_key = f"{app_id}_local_check"
+    def check_achievements_file(self, game_path, game_id):
+        """
+        Check if achievement file exists for a game and register it in self.achievement_files
+        Supports both achievements.ini and achievements.json files
 
-        # Check cache for local achievement file info
-        cached_info = self.cache_manager.get_cache("local_achievements", cache_key)
-        if cached_info:
-            if cached_info.get("file_exists") and cached_info.get("file_path"):
-                self.achievement_files[app_id] = cached_info["file_path"]
-            return cached_info.get("file_exists", False)
+        Args:
+            game_path (str): Path to the game directory
+            game_id (str): Game ID (app_id)
 
-        # Search for achievement files
-        achievement_files = ['stats.ini', 'achievements.ini', 'steam_emu.ini']
-        found_file = None
+        Returns:
+            bool: True if achievement file found and registered, False otherwise
+        """
+        if not game_path or not os.path.exists(game_path):
+            if self.verbose:
+                print(f"Game path does not exist: {game_path}")
+            return False
 
-        try:
-            for root, dirs, files in os.walk(game_path):
-                for achievement_file in achievement_files:
-                    if achievement_file in files:
-                        found_file = os.path.join(root, achievement_file)
-                        break
-                if found_file:
-                    break
-        except OSError as e:
-            self.log_debug(f"Error scanning achievement files in {game_path}: {e}")
+        game_id_str = str(game_id)
+        possible_files = ['achievements.ini', 'achievements.json']
 
-        # Cache the result
-        cache_data = {
-            "file_exists": found_file is not None,
-            "file_path": found_file,
-            "scan_time": time.time()
-        }
+        for filename in possible_files:
+            file_path = os.path.join(game_path, filename)
+            if os.path.exists(file_path):
+                # Vérifier que le fichier n'est pas vide et est lisible
+                try:
+                    if os.path.getsize(file_path) == 0:
+                        if self.verbose:
+                            print(f"Achievement file is empty: {file_path}")
+                        continue
 
-        self.cache_manager.set_cache("local_achievements", cache_key, cache_data, ttl=3600)  # 1 hour
+                    # Test de lecture rapide pour vérifier que le fichier est valide
+                    if filename.endswith('.json'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            json.load(f)  # Test parsing JSON
+                    elif filename.endswith('.ini'):
+                        config = configparser.ConfigParser()
+                        config.read(file_path, encoding='utf-8')
+                        # Vérifier qu'il y a au moins une section
+                        if not config.sections():
+                            if self.verbose:
+                                print(f"INI file has no sections: {file_path}")
+                            continue
 
-        if found_file:
-            self.achievement_files[app_id] = found_file
-            self.log_debug(f"Found achievement file for {app_id}: {found_file}")
-            return True
+                    # Si on arrive ici, le fichier est valide
+                    self.achievement_files[game_id_str] = file_path
+                    if self.verbose:
+                        print(f"✅ Found valid achievement file for {game_id}: {file_path}")
+                    return True
 
+                except (json.JSONDecodeError, configparser.Error, UnicodeDecodeError, OSError) as e:
+                    if self.verbose:
+                        print(f"❌ Invalid achievement file {file_path}: {e}")
+                    continue
+
+        if self.verbose:
+            print(f"❌ No valid achievement files found for {game_id} in {game_path}")
         return False
 
     def parse_achievement_file(self, file_path):
-        """Parse local achievement file"""
+        """Parse local achievement file (supports .json and .ini, et sections numériques)"""
         achievements = {}
-
         try:
-            config = configparser.ConfigParser()
-            config.read(file_path, encoding='utf-8')
-
-            for section in config.sections():
-                if 'achievement' in section.lower():
-                    for key in config[section]:
-                        if key.startswith('ach_') or 'achievement' in key.lower():
-                            achievements[key] = config[section][key]
-
-        except (configparser.Error, OSError, UnicodeDecodeError) as e:
+            if file_path.endswith('.json'):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                for ach_id, ach_data in data.items():
+                    # On ignore les achievements non complétés
+                    if not ach_data.get('earned', False):
+                        continue
+                    achievements[ach_id] = {
+                        'earned': True,
+                        'earned_time': ach_data.get('earned_time', 0)
+                    }
+            elif file_path.endswith('.ini'):
+                config = configparser.ConfigParser()
+                config.read(file_path, encoding='utf-8')
+                for section in config.sections():
+                    if section == 'SteamAchievements':
+                        continue  # On ignore la section globale
+                    # Si la section est un nombre, on considère que c'est un achievement
+                    if section.isdigit() or section.lower().startswith('ach') or 'achievement' in section.lower():
+                        achieved = config[section].get('Achieved')
+                        unlock_time = config[section].get('UnlockTime', 0)
+                        if achieved is not None:
+                            achievements[section] = {
+                                'earned': achieved == '1',
+                                'earned_time': int(unlock_time)
+                            }
+        except (configparser.Error, OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
             self.log_debug(f"Error parsing achievement file {file_path}: {e}")
-
         return achievements
 
     def get_best_achievements_with_key(self, app_id, api_key):
@@ -364,123 +395,106 @@ class AchievementParser:
         """Get cache statistics"""
         return self.cache_manager.get_cache_stats()
 
+    def get_obtained_achievements_count(self, ini_path):
+        """Récupère le nombre d'achievements obtenus depuis un fichier achievements.ini"""
+        if not os.path.exists(ini_path):
+            if self.verbose:
+                print(f"Fichier non trouvé : {ini_path}")
+            return None
+        config = configparser.ConfigParser()
+        try:
+            config.read(ini_path, encoding='utf-8')
+            if 'SteamAchievements' in config:
+                count_str = config['SteamAchievements'].get('Count')
+                if count_str is not None:
+                    try:
+                        return int(count_str)
+                    except ValueError:
+                        if self.verbose:
+                            print(f"Valeur Count invalide dans {ini_path} : {count_str}")
+                        return None
+            if self.verbose:
+                print(f"Section [SteamAchievements] ou clé Count absente dans {ini_path}")
+        except Exception as e:
+            if self.verbose:
+                print(f"Erreur lecture INI {ini_path} : {e}")
+        return None
 
-# TESTS DÉTAILLÉS
-if __name__ == "__main__":
-    import time
+    def get_local_achievements_count(self, app_id):
+        """
+        Récupère le nombre d'achievements obtenus à partir du fichier achievements.ini
+        en utilisant les chemins connus de la config.
+        TODO : Gerer les achievements.json
+        """
+        import configparser
+        import re
+        import os
 
-    # Initialize with configuration
-    test_achievement_parser = AchievementParser()
+        config = self.config_manager
+        known_locations = config.known_locations if hasattr(config, 'known_locations') else config.get('known_locations', {})
+        possible_files = []
+        for loc in known_locations.values():
+            base_path = os.path.expanduser(loc['base_path'])
+            for team in loc['teams']:
+                for fname in ["achievements.ini"]:
+                    candidate = os.path.join(base_path, team, app_id, fname)
+                    if os.path.exists(candidate):
+                        possible_files.append(candidate)
+        if not possible_files:
+            return 0
+        ini_path = possible_files[0]
+        parser = configparser.ConfigParser()
+        parser.read(ini_path, encoding="utf-8")
+        if 'SteamAchievements' in parser:
+            count = parser['SteamAchievements'].get('Count')
+            if count and re.match(r"^\d+$", count):
+                return int(count)
+        return 0
 
-    # Show cache stats
-    print("\n=== CACHE STATISTICS (INITIAL) ===")
-    stats = test_achievement_parser.get_cache_stats()
-    if stats["enabled"]:
-        print(f"Cache enabled: {stats['total_files']} files, {stats['total_size_mb']} MB")
-        for cache_type, type_stats in stats["by_type"].items():
-            if type_stats["files"] > 0:
-                print(f"  {cache_type}: {type_stats['files']} files, {type_stats['size_mb']} MB")
-    else:
-        print("Cache disabled")
+    @staticmethod
+    def get_rarity_level(percentage):
+        """Détermine la rareté d'un achievement selon son pourcentage de déblocage"""
+        if percentage >= 50:
+            return 'common'
+        elif percentage >= 25:
+            return 'uncommon'
+        elif percentage >= 10:
+            return 'rare'
+        elif percentage >= 5:
+            return 'very_rare'
+        else:
+            return 'ultra_rare'
 
-    # Initialize game detector for testing
-    test_game_detector = game_detector.GameDetector()
-    test_game_detector.scan_all_locations()
-    test_game_detector.get_all_games_names()
+    def get_local_achievements_rarity_breakdown(self, app_id):
+        """
+        Retourne un dictionnaire avec le nombre d'achievements obtenus par rareté pour un jeu donné.
+        Exemple de retour : {'common': 2, 'uncommon': 1, ...}
+        """
+        rarity_stats = {'common': 0, 'uncommon': 0, 'rare': 0, 'very_rare': 0, 'ultra_rare': 0}
+        achievements = self.get_best_achievements_auto(app_id)
+        if not achievements:
+            return rarity_stats
+        # Récupère les clés des achievements obtenus localement (non normalisées, car dans achievements.ini ce sont souvent des IDs numériques)
+        local_keys = set()
+        if app_id in self.achievement_files:
+            file_path = self.achievement_files[app_id]
+            local_achievements = self.parse_achievement_file(file_path)
+            if not local_achievements:
+                # Si le parsing n'a rien donné, essaye de lire la section [SteamAchievements] (cas des fichiers achievements.ini)
+                config = configparser.ConfigParser()
+                config.read(file_path, encoding='utf-8')
+                if 'SteamAchievements' in config:
+                    for key in config['SteamAchievements']:
+                        if key.isdigit():
+                            local_keys.add(key)
+            else:
+                local_keys = set(local_achievements.keys())
+            print("DEBUG: Local achievements found:", local_keys)
+        # Compte la rareté pour chaque succès obtenu
+        for ach_key, ach_data in achievements.items():
+            if ach_key in local_keys:
+                percentage = ach_data.get('percentage', 0)
+                rarity = self.get_rarity_level(percentage)
+                rarity_stats[rarity] += 1
+        return rarity_stats
 
-    # Check for achievement files in detected games
-    for game_id in test_game_detector.games_id:
-        game_path = test_game_detector.games_sources[game_id]['path']
-        test_achievement_parser.check_achievements_file(game_path, game_id)
-
-    print("Achievement files found:", test_achievement_parser.achievement_files)
-
-    print("\n=== DETAILED ACHIEVEMENT TEST ===")
-    test_app_id = '250900'  # The Binding of Isaac: Rebirth
-
-    # Force verbose mode for this test
-    original_verbose = test_achievement_parser.verbose
-    test_achievement_parser.verbose = True
-    test_achievement_parser.show_api_calls = True
-
-    print(f"\n--- Testing App ID: {test_app_id} ---")
-    print(f"API Key available: {'YES' if test_achievement_parser.steam_api_key else 'NO'}")
-    print(f"Local file available: {'YES' if test_app_id in test_achievement_parser.achievement_files else 'NO'}")
-
-    if test_app_id in test_achievement_parser.achievement_files:
-        print(f"Local file path: {test_achievement_parser.achievement_files[test_app_id]}")
-
-        # Test local file parsing
-        local_achievements = test_achievement_parser.parse_achievement_file(
-            test_achievement_parser.achievement_files[test_app_id]
-        )
-        print(f"Local achievements found: {len(local_achievements)}")
-        if local_achievements:
-            print("Sample local achievements:")
-            for i, (key, value) in enumerate(local_achievements.items()):
-                if i >= 3:  # Show first 3
-                    break
-                print(f"  {key}: {value}")
-
-    # First call - will cache
-    print(f"\n--- FIRST CALL (should fetch and cache) ---")
-    start_time = time.time()
-    achievements_1 = test_achievement_parser.get_best_achievements_auto(test_app_id)
-    time_1 = time.time() - start_time
-
-    # Second call - should use cache
-    print(f"\n--- SECOND CALL (should use cache) ---")
-    start_time = time.time()
-    achievements_2 = test_achievement_parser.get_best_achievements_auto(test_app_id)
-    time_2 = time.time() - start_time
-
-    print(f"\n--- PERFORMANCE RESULTS ---")
-    print(f"First call: {time_1:.3f}s ({len(achievements_1)} achievements)")
-    print(f"Second call: {time_2:.3f}s ({len(achievements_2)} achievements)")
-    if time_2 > 0:
-        print(f"Speed improvement: {time_1 / time_2:.1f}x faster")
-
-    # Show achievements details
-    print(f"\n--- ACHIEVEMENTS DETAILS ---")
-    if achievements_2:
-        print(f"Total achievements: {len(achievements_2)}")
-        print("Sample achievements:")
-        for i, (achievement_key, achievement_value) in enumerate(achievements_2.items()):
-            if i >= 5:  # Show first 5
-                break
-            source_icon = "🔑" if achievement_value['source'] in ['STEAM_API', 'LOCAL_COMBINED'] else "🆓"
-            print(
-                f"  {source_icon} {achievement_key}: {achievement_value['displayName']} ({achievement_value['percentage']}%) - Source: {achievement_value['source']}")
-    else:
-        print("❌ NO achievements found - investigating...")
-
-        # Manual investigation
-        print("\n--- MANUAL INVESTIGATION ---")
-
-        # Test gratuit method directly
-        gratuit_achievements = test_achievement_parser.get_gratuit_achievements(test_app_id)
-        print(f"Gratuit method result: {len(gratuit_achievements)} achievements")
-
-        if not gratuit_achievements and test_app_id in test_achievement_parser.achievement_files:
-            print("Trying to parse local file manually...")
-            try:
-                local_file_path = test_achievement_parser.achievement_files[test_app_id]
-                with open(local_file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    print(f"File content preview (first 500 chars):")
-                    print(content[:500])
-                    print("...")
-            except Exception as e:
-                print(f"Error reading local file: {e}")
-
-    # Cache stats after test
-    print(f"\n=== CACHE STATISTICS (AFTER TEST) ===")
-    stats_after = test_achievement_parser.get_cache_stats()
-    if stats_after["enabled"]:
-        print(f"Cache now: {stats_after['total_files']} files, {stats_after['total_size_mb']} MB")
-        for cache_type, type_stats in stats_after["by_type"].items():
-            if type_stats["files"] > 0:
-                print(f"  {cache_type}: {type_stats['files']} files, {type_stats['size_mb']} MB")
-
-    # Restore original verbose setting
-    test_achievement_parser.verbose = original_verbose

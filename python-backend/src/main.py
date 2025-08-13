@@ -4,6 +4,9 @@ from flask_cors import CORS
 import sys
 import os
 
+
+
+
 # Add src directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -16,6 +19,7 @@ CORS(app)  # Enable CORS for Electron frontend
 # Initialize components
 achievement_parser = AchievementParser()
 game_detector = GameDetector()
+
 
 
 @app.route('/api/games', methods=['GET'])
@@ -33,13 +37,19 @@ def get_games():
 
         # ✅ UTILISE games_sources qui contient tout !
         for app_id, game_info in game_detector.games_sources.items():
+            # Recherche du nombre d'achievements obtenus
+            local_achievements_count = achievement_parser.get_local_achievements_count(app_id)
+            # Récupère le nombre total d'achievements obtenables (même logique que test ligne 500+)
+            achievements = achievement_parser.get_best_achievements_auto(app_id)
+            total_obtenable_achievements = len(achievements) if achievements else 0
             game_data = {
                 'app_id': app_id,
                 'name': game_info.get('name', f"Game {app_id}"),
                 'path': game_info.get('path', ''),
                 'team': game_info.get('team', 'Unknown'),
                 'location': game_info.get('location', ''),
-                'local_achievements_count': 0,
+                'local_achievements_count': local_achievements_count,
+                'total_obtenable_achievements': total_obtenable_achievements,
                 'has_api_data': False
             }
             game_list.append(game_data)
@@ -157,35 +167,37 @@ def get_game_stats(app_id):
     Retourne les statistiques d'un jeu
     """
     try:
-        achievements = achievement_parser.get_best_achievements_auto(app_id)
+        # Scan les jeux et leurs fichiers d'achievements
+        game_detector.scan_all_locations()
+        game_detector.get_all_games_names()
+        for detected_app_id, game_info in game_detector.games_sources.items():
+            game_path = game_info.get('path', '')
+            if game_path:
+                achievement_parser.check_achievements_file(game_path, detected_app_id)
 
+        achievements = achievement_parser.get_best_achievements_auto(app_id)
         if not achievements:
             return jsonify({
                 'success': False,
                 'error': f'No data found for game {app_id}'
             }), 404
 
-        # Get local progress
-        local_progress = {}
-        if app_id in achievement_parser.achievement_files:
-            file_path = achievement_parser.achievement_files[app_id]
-            local_achievements = achievement_parser.parse_achievement_file(file_path)
-            local_progress = {ach['name']: ach for ach in local_achievements}
-
-        # Calculate statistics
+        unlocked_count = achievement_parser.get_local_achievements_count(app_id)
         total_achievements = len(achievements)
-        unlocked_count = len(local_progress)
+
+        app_id_str = str(app_id)
+        completed_achievements = {}
+        if app_id_str in achievement_parser.achievement_files:
+            file_path = achievement_parser.achievement_files[app_id_str]
+            completed_achievements = achievement_parser.parse_achievement_file(file_path)
 
         rarity_stats = {'common': 0, 'uncommon': 0, 'rare': 0, 'very_rare': 0, 'ultra_rare': 0}
         unlocked_rarity_stats = {'common': 0, 'uncommon': 0, 'rare': 0, 'very_rare': 0, 'ultra_rare': 0}
-
         for ach_key, ach_data in achievements.items():
             percentage = ach_data.get('percentage', 0)
-            rarity = get_rarity_level(percentage)
+            rarity = achievement_parser.get_rarity_level(percentage)
             rarity_stats[rarity] += 1
-
-            if ach_key in local_progress:
-                unlocked_rarity_stats[rarity] += 1
+            # unlocked_rarity_breakdown laissé inchangé pour l'instant
 
         return jsonify({
             'success': True,
@@ -194,13 +206,12 @@ def get_game_stats(app_id):
                 'total_achievements': total_achievements,
                 'unlocked_achievements': unlocked_count,
                 'locked_achievements': total_achievements - unlocked_count,
-                'completion_percentage': round((unlocked_count / total_achievements) * 100,
-                                               1) if total_achievements > 0 else 0,
+                'completion_percentage': round((unlocked_count / total_achievements) * 100, 1) if total_achievements > 0 else 0,
                 'rarity_breakdown': rarity_stats,
-                'unlocked_rarity_breakdown': unlocked_rarity_stats
+                'unlocked_rarity_breakdown': unlocked_rarity_stats,
+                'completed_achievements': completed_achievements
             }
         })
-
     except Exception as e:
         return jsonify({
             'success': False,
