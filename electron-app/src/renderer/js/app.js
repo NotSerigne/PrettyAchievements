@@ -13,6 +13,13 @@ class PrettyAchievementsUI {
         this.rescanRequested = false;
         this.lastDetectedCrackedGames = null; // cache dernier résultat non vide
 
+        // ✅ NOUVEAU SYSTÈME DE SURVEILLANCE DES ACHIEVEMENTS
+        this.achievementsWatcher = {
+            lastKnownStats: new Map(), // appId -> stats object
+            watchInterval: null,
+            isWatching: false
+        };
+
         this.initializeElements();
         this.ensureRescanButton();
         this.ensureSortButton();
@@ -1689,6 +1696,168 @@ class PrettyAchievementsUI {
                 <span>${rarity}</span>
             </div>
         </div>`;
+    }
+
+    // ===== SURVEILLANCE DES ACHIEVEMENTS =====
+    startAchievementsWatcher() {
+        if (this.achievementsWatcher.isWatching) return;
+        this.achievementsWatcher.isWatching = true;
+        this.achievementsWatcher.watchInterval = setInterval(() => {
+            this.checkForAchievementUpdates();
+        }, 5000); // Vérifie toutes les 5 secondes
+    }
+
+    stopAchievementsWatcher() {
+        this.achievementsWatcher.isWatching = false;
+        if (this.achievementsWatcher.watchInterval) {
+            clearInterval(this.achievementsWatcher.watchInterval);
+            this.achievementsWatcher.watchInterval = null;
+        }
+    }
+
+    async checkForAchievementUpdates() {
+        try {
+            const detectedGames = this.getDetectedGames();
+
+            for (const game of detectedGames) {
+                const appId = game.steamAppId || game.appId || game.id;
+                if (!appId) continue;
+
+                // Récupérer les stats actuelles
+                const res = await fetch(`http://localhost:5000/api/games/${appId}/stats`);
+                const json = await res.json();
+
+                if (json && json.success) {
+                    const currentStats = json.stats;
+                    const oldStats = this.achievementsWatcher.lastKnownStats.get(String(appId));
+
+                    if (oldStats) {
+                        // Comparer les achievements débloqués pour détecter les nouveaux
+                        const oldCompleted = oldStats.completed_achievements || {};
+                        const newCompleted = currentStats.completed_achievements || {};
+
+                        // Trouver les nouveaux achievements
+                        const newAchievements = [];
+                        for (const [achKey, achData] of Object.entries(newCompleted)) {
+                            if (achData.earned && (!oldCompleted[achKey] || !oldCompleted[achKey].earned)) {
+                                newAchievements.push(achKey);
+                            }
+                        }
+
+                        // Si nouveaux achievements détectés, récupérer leurs détails et notifier
+                        if (newAchievements.length > 0) {
+                            await this.notifyNewAchievements(appId, game.name, newAchievements);
+                        }
+                    }
+
+                    // Mettre à jour les stats connues
+                    this.achievementsWatcher.lastKnownStats.set(String(appId), currentStats);
+                }
+            }
+        } catch (e) {
+            console.warn('Erreur surveillance achievements:', e);
+        }
+    }
+
+    async notifyNewAchievements(appId, gameName, achievementKeys) {
+        try {
+            // Récupérer les détails des achievements
+            const res = await fetch(`http://localhost:5000/api/games/${appId}/achievements`);
+            const json = await res.json();
+
+            if (json && json.success) {
+                const allAchievements = json.achievements || [];
+                const soundFileMap = {
+                    'steam': 'steam',
+                    'steam-deck': 'steamdeck',
+                    'steamdeck': 'steamdeck',
+                    'xbox': 'xbox',
+                    'xbox-rare': 'xboxrare',
+                    'xboxrare': 'xboxrare',
+                    'ps4': 'ps4',
+                    'ps5': 'ps5',
+                    'ps5platinum': 'ps5platinum',
+                    'win8': 'win8',
+                    'win10': 'win10',
+                    'win11': 'win11',
+                };
+
+                for (const achKey of achievementKeys) {
+                    const achievement = allAchievements.find(ach => ach.key === achKey);
+                    if (!achievement) continue;
+
+                    // Déterminer la rareté
+                    const percentage = achievement.percentage || 0;
+                    let rarityIcon = '';
+                    let rarityText = '';
+                    if (percentage > 50) {
+                        rarityIcon = '🟢';
+                        rarityText = 'Commun';
+                    } else if (percentage > 20) {
+                        rarityIcon = '🔵';
+                        rarityText = 'Peu commun';
+                    } else if (percentage > 5) {
+                        rarityIcon = '🟣';
+                        rarityText = 'Rare';
+                    } else if (percentage > 1) {
+                        rarityIcon = '🔴';
+                        rarityText = 'Très rare';
+                    } else {
+                        rarityIcon = '🟡';
+                        rarityText = 'Ultra rare';
+                    }
+
+                    // Construire le message de notification
+                    const message = `🏆 ${achievement.name}\n${achievement.description}\n${rarityIcon} ${rarityText} (${percentage.toFixed(1)}%)`;
+
+                    console.log(`[ACHIEVEMENT UNLOCKED] ${gameName}: ${achievement.name}`);
+
+                    // Jouer le son approprié selon la rareté
+                    const soundSelect = document.getElementById('notificationSound');
+                    if (soundSelect) {
+                        let soundValue = soundSelect.value;
+
+                        // Son spécial pour ultra rare
+                        if (percentage <= 1 && soundValue === 'ps5') {
+                            soundValue = 'ps5platinum';
+                        } else if (percentage <= 1 && soundValue === 'xbox') {
+                            soundValue = 'xbox-rare';
+                        }
+
+                        if (soundValue && soundValue !== 'none') {
+                            let fileKey = soundFileMap[soundValue];
+                            if (!fileKey) {
+                                fileKey = soundValue.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            }
+                            const audio = new Audio(`../notifications/sounds/${fileKey}.mp3`);
+                            audio.volume = 0.8;
+                            audio.play().catch(() => {});
+                        }
+                    }
+
+                    // Afficher la notification custom
+                    const pos = localStorage.getItem('notifyPosition') || 'bottom-right';
+                    const duration = percentage <= 1 ? 7000 : 4000; // Plus long pour ultra rare
+
+                    if (window.electronAPI?.send) {
+                        window.electronAPI.send('show-custom-notification', {
+                            message,
+                            duration,
+                            position: pos
+                        });
+                    } else if (typeof window.showNotification === 'function') {
+                        window.showNotification(message, duration, pos);
+                    }
+
+                    // Attendre un peu entre chaque notification si plusieurs achievements
+                    if (achievementKeys.length > 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Erreur notification nouveaux achievements:', e);
+        }
     }
 }
 
