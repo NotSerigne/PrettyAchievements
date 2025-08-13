@@ -32,33 +32,33 @@ function startPythonBackend() {
 }
 
 function createMainWindow() {
+    console.log('[DEBUG][main.js] createMainWindow cwd:', process.cwd());
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
         show: false,
-
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'), // __dirname = .../electron-app/src
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true
         }
     });
     win.setMenuBarVisibility(false);
-    const indexHtml = path.join(__dirname, 'renderer', 'index.html');
+    // Correction : utiliser un chemin absolu et normalisé pour index.html
+    const indexHtml = path.normalize(path.resolve(__dirname, 'renderer', 'index.html'));
+    console.log('[DEBUG][main.js] indexHtml path:', indexHtml, 'exists:', fs.existsSync(indexHtml));
+    if (!fs.existsSync(indexHtml)) {
+        console.error('[ERREUR] Le fichier index.html est introuvable à', indexHtml);
+    }
     win.loadFile(indexHtml).catch(err => {
         console.error('Erreur loading index.html:', err);
     });
-
     if (isDev) win.webContents.openDevTools({ mode: 'right' });
-
     win.once('ready-to-show', () => win.show());
-
-    // Ouvrir les liens externes dans le navigateur par défaut
     win.webContents.setWindowOpenHandler(({ url }) => {
         shell.openExternal(url);
         return { action: 'deny' };
     });
-
     return win;
 }
 
@@ -149,7 +149,7 @@ if (!app.requestSingleInstanceLock()) {
         }
     });
 
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
         const win = createMainWindow();
 
         // Démarrer le backend Python (Flask) au démarrage
@@ -232,7 +232,16 @@ function showCustomNotification({ message, duration = 3000, position }) {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true
-        }
+        },
+        // Ajout pour forcer l'affichage au-dessus de tout, même des apps admin
+        alwaysOnTop: true,
+        alwaysOnTopLevel: 'screen-saver', // niveau le plus élevé possible
+        // Ajout pour Windows : notifications au-dessus des jeux admin
+        // (nécessite Electron >= 14)
+        // Voir https://www.electronjs.org/docs/latest/api/browser-window/#new-browserwindowoptions
+        // et https://github.com/electron/electron/issues/28642
+        // On force le type de fenêtre à 'toolbar' pour Windows
+        type: process.platform === 'win32' ? 'toolbar' : undefined
     });
     notifWin.setIgnoreMouseEvents(true);
     notifWin.loadFile(path.join(__dirname, 'notifications', 'notification.html'));

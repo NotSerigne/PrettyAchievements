@@ -922,6 +922,60 @@ class PrettyAchievementsUI {
             };
             this.testNotificationBtn.addEventListener('click', this._testNotifListener);
         }
+        // Ajout d'un avertissement permanent pour les notifications en plein écran
+        const notifFeedback = document.getElementById('testNotificationFeedback');
+        if (notifFeedback) {
+            notifFeedback.innerHTML =
+                "<span style='color:var(--text-secondary)'>⚠️ Les notifications personnalisées peuvent ne pas s'afficher au-dessus d'un jeu en plein écran. Pour maximiser la compatibilité, lancez Pretty Achievements en tant qu'administrateur et privilégiez le mode fenêtré sans bordure dans vos jeux.</span>";
+        }
+
+        // Pré-écoute du son de notification
+        const soundSelect = document.getElementById('notificationSound');
+        // Mapping des valeurs du select vers les vrais noms de fichiers
+        const soundFileMap = {
+            'steam': 'steam',
+            'steam-deck': 'steamdeck',
+            'steamdeck': 'steamdeck',
+            'xbox': 'xbox',
+            'xbox-rare': 'xboxrare',
+            'xboxrare': 'xboxrare',
+            'ps4': 'ps4',
+            'ps5': 'ps5',
+            'ps5platinum': 'ps5platinum',
+            'win8': 'win8',
+            'win10': 'win10',
+            'win11': 'win11',
+        };
+        if (soundSelect) {
+            // Charger la valeur sauvegardée au démarrage
+            const savedSound = localStorage.getItem('notificationSound');
+            if (savedSound && soundSelect.value !== savedSound) {
+                soundSelect.value = savedSound;
+            }
+            if (this._notifAudio) {
+                try { this._notifAudio.pause(); this._notifAudio = null; } catch(_){}
+            }
+            soundSelect.addEventListener('change', (e) => {
+                const val = e.target.value;
+                // Sauvegarder la sélection à chaque changement
+                localStorage.setItem('notificationSound', val);
+                if (this._notifAudio) {
+                    this._notifAudio.pause();
+                    this._notifAudio.currentTime = 0;
+                }
+                if (val && val !== 'none') {
+                    // Normalisation du nom pour supporter tous les formats
+                    let fileKey = soundFileMap[val];
+                    if (!fileKey) {
+                        fileKey = val.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    }
+                    const audio = new Audio(`../notifications/sounds/${fileKey}.mp3`);
+                    audio.volume = 0.7;
+                    audio.play().catch(()=>{});
+                    this._notifAudio = audio;
+                }
+            });
+        }
 
         // Charger depuis le stockage et afficher
         this.scanFolders = this.loadScanFolders();
@@ -1170,6 +1224,7 @@ class PrettyAchievementsUI {
             setBool('autoStart', cfg?.general?.autoStart);
             setBool('notifications', cfg?.general?.notifications);
             setBool('minimizeToTray', cfg?.general?.minimizeToTray);
+            setBool('runAsAdmin', cfg?.general?.runAsAdmin);
             // images
             setBool('enableSteamImages', cfg?.images?.enableSteamImages);
             setVal('steamImageQuality', cfg?.images?.steamImageQuality);
@@ -1289,6 +1344,37 @@ class PrettyAchievementsUI {
         const pos = localStorage.getItem('notifyPosition') || 'bottom-right';
         const message = 'Ceci est une notification de test !';
         const duration = 3500;
+
+        // Joue le son sélectionné
+        const soundSelect = document.getElementById('notificationSound');
+        const soundFileMap = {
+            'steam': 'steam',
+            'steam-deck': 'steamdeck',
+            'steamdeck': 'steamdeck',
+            'xbox': 'xbox',
+            'xbox-rare': 'xboxrare',
+            'xboxrare': 'xboxrare',
+            'ps4': 'ps4',
+            'ps5': 'ps5',
+            'ps5platinum': 'ps5platinum',
+            'win8': 'win8',
+            'win10': 'win10',
+            'win11': 'win11',
+        };
+        if (soundSelect) {
+            const val = soundSelect.value;
+            if (val && val !== 'none') {
+                let fileKey = soundFileMap[val];
+                if (!fileKey) {
+                    fileKey = val.toLowerCase().replace(/[^a-z0-9]/g, '');
+                }
+                const audio = new Audio(`../notifications/sounds/${fileKey}.mp3`);
+                audio.volume = 0.7;
+                audio.play().catch(()=>{});
+                this._notifAudio = audio;
+            }
+        }
+
         if (window.electronAPI?.send) {
             window.electronAPI.send('show-custom-notification', { message, duration, position: pos });
         } else if (typeof window.showNotification === 'function') {

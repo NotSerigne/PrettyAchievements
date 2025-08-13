@@ -1,6 +1,7 @@
 // notification.js
 // Nouveau système de notification moderne
 window.showNotification = function(message, duration = 3000, position = 'bottom-right') {
+    console.log('[DEBUG][notification.js] showNotification', { message, duration, position });
     let root = document.getElementById('notification-root');
     if (!root) {
         root = document.createElement('div');
@@ -63,6 +64,15 @@ window.showNotification = function(message, duration = 3000, position = 'bottom-
 // Pour compatibilité : écoute l'IPC 'notification/show' si Electron
 if (window.electronAPI && window.electronAPI.on) {
     window.electronAPI.on('notification/show', (data) => {
+        console.log('[DEBUG][notification.js] notification/show event', data);
         window.showNotification(data.message, data.duration, data.position);
     });
 }
+
+// Ajout : support natif pour la fenêtre notification Electron
+try {
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('notification/show', (_event, data) => {
+        window.showNotification(data.message, data.duration, data.position);
+    });
+} catch (_) {}
