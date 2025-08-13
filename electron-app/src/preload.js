@@ -20,3 +20,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ouvrir une URL externe en sécurité
     openExternal: (url) => shell.openExternal(url)
 });
+
+console.log('[preload] Chargé dans la fenêtre:', window.location.pathname);

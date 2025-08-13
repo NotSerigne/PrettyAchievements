@@ -1,0 +1,74 @@
+/* notification.css - Design moderne pour la fenêtre de notification */
+body {
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+     /* Correction : autoriser le scroll vertical */
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+#notification-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+}
+/* Chrome, Safari, Opera (WebKit/Blink) */
+*::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+}
+*::-webkit-scrollbar-thumb {
+    background: transparent !important;
+}
+*::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+/* Firefox */
+* {
+    scrollbar-width: none !important;
+}
+/* IE et old Edge */
+* {
+    -ms-overflow-style: none !important;
+}
+.pa-notification {
+    min-width: 320px;
+    max-width: calc(100vw - 64px);
+    max-height: calc(100vh - 64px);
+    box-sizing: border-box;
+    background: linear-gradient(135deg, #232a3a 70%, #679cdf 100%);
+    color: #fff;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(103,156,223,0.18);
+    padding: 8px 12px;
+    font-size: 1.15rem;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+    opacity: 0.98;
+    animation: pa-fade-in 0.4s cubic-bezier(.4,2,.3,1) forwards;
+    overflow: hidden !important;
+}
+.pa-notification-title {
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+    color: #fff;
+}
+.pa-notification-message {
+    font-size: 1rem;
+    color: #eaf2ff;
+}
+@keyframes pa-fade-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 0.98; transform: translateY(0); }
+}

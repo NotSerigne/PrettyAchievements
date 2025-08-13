@@ -180,127 +180,85 @@ ipcMain.handle('games/detect-cracked', async () => {
     try { return await runGameDetector(); } catch (e) { return {}; }
 });
 
-// ===== Custom overlay notification (outside app window) =====
-let __paToasts = [];
-function showOverlayNotification({ title = 'Notification', message = '', type = 'info', duration = 4000, position = 'bottom-right', achievementName = '', achievementDescription = '', communityPercent = null } = {}) {
-    try {
-        // Afficher sur l'écran principal (primary)
-        const display = screen.getPrimaryDisplay();
-        const work = display.workArea; // { x, y, width, height }
-        const displayId = display.id ?? `${work.x}:${work.y}:${work.width}:${work.height}`;
-        const width = 420;
-        const height = 110;
-        const margin = 16;
-        const stackCount = __paToasts.filter(t => t && t.displayId === displayId && t.position === position).length;
-        const totalOffset = stackCount * (height + 10);
-        let targetX = work.x + work.width - width - margin; // default right
-        let targetY = work.y + work.height - height - margin - totalOffset; // default bottom
-        const [vert, horiz] = (() => {
-            const p = String(position || '').toLowerCase();
-            if (p.includes('top')) return ['top', p.includes('left') ? 'left' : p.includes('center') ? 'center' : 'right'];
-            return ['bottom', p.includes('left') ? 'left' : p.includes('center') ? 'center' : 'right'];
-        })();
-        if (horiz === 'left') targetX = work.x + margin;
-        if (horiz === 'center') targetX = Math.round(work.x + (work.width - width) / 2);
-        if (vert === 'top') targetY = work.y + margin + totalOffset;
-
-        // Determine entrance direction for CSS animation inside the window
-        const enterDir = (horiz === 'left') ? 'left' : (horiz === 'right') ? 'right' : (vert === 'top' ? 'top' : 'bottom');
-
-        const win = new BrowserWindow({
-            width,
-            height,
-            x: targetX,
-            y: targetY,
-            frame: false,
-            transparent: true,
-            resizable: false,
-            movable: false,
-            focusable: false,
-            show: false,
-            skipTaskbar: true,
-            alwaysOnTop: true,
-            hasShadow: false,
-            backgroundColor: '#00000000',
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: true,
-                backgroundThrottling: false
-            }
-        });
-        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-        try { win.setAlwaysOnTop(true, 'screen-saver'); } catch (_) { win.setAlwaysOnTop(true); }
-
-        const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        const border = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#4a78c2';
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
-        <style>
-        html,body{margin:0;padding:0;background:transparent;font-family:Segoe UI,Tahoma,sans-serif}
-        .outer{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-        .track{display:flex;align-items:center;gap:10px}
-        .core{width:84px;height:84px;border-radius:12px;background:rgba(20,20,20,0.9);border:1px solid ${border};box-shadow:0 10px 24px rgba(0,0,0,0.35);transition:transform .28s ease;will-change:transform}
-        .detail{height:84px;width:0;overflow:hidden;border-radius:10px;border:1px solid #4a78c2;background:linear-gradient(135deg,#3a4a6a,#679CDF);display:flex;align-items:center;gap:12px;padding:12px 14px;box-shadow:0 10px 24px rgba(0,0,0,0.35);color:#fff;transition:width .34s cubic-bezier(.22,1,.36,1);will-change:width}
-        .text{flex:1 1 auto;min-width:0}
-        .title{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
-        .msg{opacity:.95;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .pct{margin-left:12px;font-weight:800;font-size:18px;white-space:nowrap}
-        /* Stage 2 reveal */
-        .reveal .core{transform:translateX(-10px)}
-        .reveal .detail{width:280px}
-        /* Directional entrance for the whole layout */
-        @keyframes enter-left{from{opacity:0;transform:translateX(-120%)}to{opacity:1;transform:translateX(0)}}
-        @keyframes enter-right{from{opacity:0;transform:translateX(120%)} to{opacity:1;transform:translateX(0)}}
-        @keyframes enter-top{from{opacity:0;transform:translateY(-120%)} to{opacity:1;transform:translateY(0)}}
-        @keyframes enter-bottom{from{opacity:0;transform:translateY(120%)} to{opacity:1;transform:translateY(0)}}
-        .enter-left .outer{animation:enter-left .3s cubic-bezier(.22,1,.36,1)}
-        .enter-right .outer{animation:enter-right .3s cubic-bezier(.22,1,.36,1)}
-        .enter-top .outer{animation:enter-top .3s cubic-bezier(.22,1,.36,1)}
-        .enter-bottom .outer{animation:enter-bottom .3s cubic-bezier(.22,1,.36,1)}
-        .leave .outer{opacity:0;transform:translateY(6px);transition:all .18s ease-in}
-        </style></head><body class="enter-${enterDir}">
-        <div class="outer">
-          <div class="track">
-            <div class="core"></div>
-            <div class="detail">
-              <div class="text">
-                <div class="title">${esc(achievementName || title)}</div>
-                <div class="msg">${esc(achievementDescription || message)}</div>
-              </div>
-              <div class="pct">${communityPercent != null ? esc(String(communityPercent)) + '%' : ''}</div>
-            </div>
-          </div>
-        </div>
-        <script>(function(){
-          try{
-            setTimeout(function(){ document.body.classList.add('reveal'); }, 140);
-            var ttl=${Math.max(0, Number(duration)||0)};
-            if(ttl>0) setTimeout(function(){
-              try{ document.body.classList.add('leave'); setTimeout(function(){ window.close() }, 180); }catch(e){ window.close(); }
-            }, ttl);
-          }catch(e){}
-        })();</script>
-        </body></html>`;
-        win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).catch(() =>{});
-        win.once('ready-to-show', () => {
-            try { win.showInactive?.(); } catch (_) { win.show(); }
-        });
-        win.on('closed', () => {
-            __paToasts = __paToasts.filter(t => t.win !== win);
-        });
-        __paToasts.push({ win, displayId, position });
-        return true;
-    } catch (e) {
-        console.error('Failed to show overlay notification:', e);
-        return false;
+// Nouveau système de notification : utilise une fenêtre dédiée
+const NOTIF_POSITIONS = {
+    'top-left': { x: 32, y: 32 },
+    'top-center': 'center-top',
+    'top-right': 'top-right',
+    'bottom-left': { x: 32, y: 'bottom' },
+    'bottom-center': 'center-bottom',
+    'bottom-right': 'bottom-right'
+};
+function getNotificationPosition(pos, winWidth, winHeight, notifWidth, notifHeight) {
+    // Calcule la position (x, y) en pixels selon le sélecteur
+    switch (pos) {
+        case 'top-left':
+            return { x: 32, y: 32 };
+        case 'top-center':
+            return { x: Math.round((winWidth - notifWidth) / 2), y: 32 };
+        case 'top-right':
+            return { x: winWidth - notifWidth - 32, y: 32 };
+        case 'bottom-left':
+            return { x: 32, y: winHeight - notifHeight - 32 };
+        case 'bottom-center':
+            return { x: Math.round((winWidth - notifWidth) / 2), y: winHeight - notifHeight - 32 };
+        case 'bottom-right':
+        default:
+            return { x: winWidth - notifWidth - 32, y: winHeight - notifHeight - 32 };
     }
 }
+function showCustomNotification({ message, duration = 3000, position }) {
+    const { screen } = require('electron');
+    const display = screen.getPrimaryDisplay();
+    const winWidth = display.workArea.width;
+    const winHeight = display.workArea.height;
 
-ipcMain.handle('notify/custom', async (_event, payload) => {
-    try { return { ok: showOverlayNotification(payload) }; } catch (e) { return { ok: false, error: String(e) }; }
+    // Fenêtre notification prend toute la taille de l'écran
+    const notifWin = new BrowserWindow({
+        width: winWidth,
+        height: winHeight,
+        x: 0,
+        y: 0,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        movable: false,
+        focusable: false,
+        show: false,
+        hasShadow: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+    notifWin.setIgnoreMouseEvents(true);
+    notifWin.loadFile(path.join(__dirname, 'notifications', 'notification.html'));
+    notifWin.once('ready-to-show', () => {
+        notifWin.webContents.send('notification/show', { message, position });
+        notifWin.showInactive();
+    });
+    setTimeout(() => {
+        if (!notifWin.isDestroyed()) notifWin.close();
+    }, duration);
+}
+ipcMain.on('show-custom-notification', (event, args) => {
+    showCustomNotification(args);
 });
-ipcMain.handle('notify:custom', async (_event, payload) => {
-    try { return { ok: showOverlayNotification(payload) }; } catch (e) { return { ok: false, error: String(e) }; }
+
+// Nouveau système de notification : utilise l'API native Electron Notification
+function showNativeNotification({ message, duration = 3000 }) {
+    new Notification({
+        title: 'Pretty Achievements',
+        body: message,
+        silent: true // pas de son
+    }).show();
+}
+
+ipcMain.on('show-native-notification', (event, args) => {
+    showNativeNotification(args);
 });
 
 // Save config to project root config.json

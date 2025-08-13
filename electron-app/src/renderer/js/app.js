@@ -1,3 +1,10 @@
+console.log('[DEBUG] app.js chargé et exécuté');
+// ...existing code...
+
+// Instanciation de l'UI principale
+document.addEventListener('DOMContentLoaded', () => {
+    window.PrettyAchievementsUI = new PrettyAchievementsUI();
+});
 class PrettyAchievementsUI {
     constructor() {
         this.sidebarOpen = false; // ✅ Track sidebar state
@@ -7,7 +14,6 @@ class PrettyAchievementsUI {
         this.lastDetectedCrackedGames = null; // cache dernier résultat non vide
 
         this.initializeElements();
-        this.initializeDemoData();
         this.ensureRescanButton();
         this.ensureSortButton();
         this.sortMode = this.loadSortMode(); // 'completion-desc' | 'completion-asc' | 'alpha-asc' | 'alpha-desc'
@@ -87,9 +93,12 @@ class PrettyAchievementsUI {
             this.burgerMenu.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('🍔 Burger clicked!');
+                console.log('[DEBUG] CLIC burgerMenu reçu');
                 this.toggleSidebar();
             });
+            console.log('[DEBUG] Listener burgerMenu ajouté:', this.burgerMenu);
+        } else {
+            console.error('[DEBUG] burgerMenu introuvable dans le DOM');
         }
 
         if (this.closeBtn) {
@@ -259,7 +268,7 @@ class PrettyAchievementsUI {
     }
 
     // ✅ RECHERCHE (sidebar uniquement)
-    handleSearch(query) {
+    handleSearch(query = '') {
         console.log('🔍 Sidebar Search:', query);
         const q = (query || '').trim().toLowerCase();
         if (!q) {
@@ -846,7 +855,6 @@ class PrettyAchievementsUI {
     }
     getAllGames() {
         const detected = this.getDetectedGames();
-        const demo = Array.isArray(this.demoData?.games) ? this.demoData.games : [];
         const seen = new Set(detected.map(g => g.steamAppId || g.id));
         const merged = detected.slice();
         demo.forEach(g => {
@@ -903,10 +911,16 @@ class PrettyAchievementsUI {
         // Bouton test notification
         this.testNotificationBtn = document.getElementById('testNotificationBtn');
         if (this.testNotificationBtn) {
-            this.testNotificationBtn.addEventListener('click', async (e) => {
+            // Correction : un seul listener, suppression des doublons
+            this.testNotificationBtn.onclick = null;
+            if (this._testNotifListener) {
+                this.testNotificationBtn.removeEventListener('click', this._testNotifListener);
+            }
+            this._testNotifListener = (e) => {
                 e.preventDefault();
-                await this.triggerTestNotification();
-            });
+                this.triggerTestNotification();
+            };
+            this.testNotificationBtn.addEventListener('click', this._testNotifListener);
         }
 
         // Charger depuis le stockage et afficher
@@ -1247,165 +1261,49 @@ class PrettyAchievementsUI {
         } catch (_) { /* ignore */ }
     }
 
-    // Déclenche une notification de test (Toast HTML/CSS custom)
-    async triggerTestNotification() {
-        const feedback = document.getElementById('testNotificationFeedback');
-        const setFeedback = (msg, ok = true) => {
-            if (!feedback) return;
-            feedback.textContent = msg;
-            feedback.style.color = ok ? 'var(--text-secondary)' : '#dc3545';
-        };
-        try {
-            const enabled = !!document.getElementById('notifications')?.checked;
-            if (!enabled) {
-                setFeedback('Astuce: Activez l’option Notifications dans Général pour les recevoir automatiquement.');
-            } else {
-                setFeedback('Notification affichée.');
-            }
-            const position = this.getSavedNotifyPosition();
-            // Use centralized notifications module
-            try {
-                await window.PANotifications?.show({
-                    title: 'Pretty Achievements',
-                    message: 'Ceci est une notification de test 🎉',
-                    type: 'info',
-                    duration: 4000,
-                    position
-                });
-            } catch (_) { /* ignore OS-level errors */ }
-        } catch (e) {
-            setFeedback('Erreur lors de l’affichage de la notification.', false);
-            try { console.warn('Test notification failed:', e); } catch (_) {}
-        }
-    }
-
-    // Anime un compteur numérique de sa valeur actuelle vers une cible
-    animateCounter(el, to, duration = 800) {
-        try {
-            const from = Math.max(0, parseInt(String(el.textContent).replace(/[^0-9-]/g, ''), 10) || 0);
-            const target = Math.max(0, Number(to) || 0);
-            if (from === target) { el.textContent = String(target); return; }
-            const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-            const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-            const step = () => {
-                const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-                const t = Math.min(1, (now - start) / duration);
-                const eased = easeOutCubic(t);
-                const current = Math.round(from + (target - from) * eased);
-                el.textContent = String(current);
-                if (t < 1) {
-                    requestAnimationFrame(step);
-                } else {
-                    el.textContent = String(target);
-                }
-            };
-            requestAnimationFrame(step);
-        } catch (_) {
-            el.textContent = String(to);
-        }
-    }
-
-    // ===== TOAST CUSTOM NOTIFICATIONS =====
-    // removed: in-app toast container
-
-    // removed: in-app toast function
-
-    // ===== NOTIFY POSITION HELPERS =====
+    // Initialise les boutons de position de notification
     initNotifyPositionGrid() {
-        try {
-            const grid = document.getElementById('notifyPositionGrid');
-            if (!grid) return;
-            const saved = this.getSavedNotifyPosition();
-            const cells = Array.from(grid.querySelectorAll('.notify-cell'));
-            // Init active state
-            cells.forEach(c => {
-                if (c.classList.contains('disabled')) return;
-                const p = c.getAttribute('data-position');
-                if (p === saved) c.classList.add('active');
-            });
-            if (!cells.some(c => c.classList.contains('active'))) {
-                const def = grid.querySelector('[data-position="bottom-right"]');
-                if (def) def.classList.add('active');
-            }
-            // Click handling (single active)
-            grid.addEventListener('click', (e) => {
-                const btn = e.target.closest?.('.notify-cell');
-                if (!btn || btn.classList.contains('disabled')) return;
-                cells.forEach(c => c.classList.remove('active'));
+        const notifyGrid = document.getElementById('notifyPositionGrid');
+        if (!notifyGrid) return;
+        // Ajoute le listener à chaque bouton
+        notifyGrid.querySelectorAll('.notify-cell[data-position]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const pos = btn.getAttribute('data-position');
+                if (!pos) return;
+                // Sauvegarde dans localStorage
+                localStorage.setItem('notifyPosition', pos);
+                // Met à jour l'apparence
+                notifyGrid.querySelectorAll('.notify-cell').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                const pos = btn.getAttribute('data-position') || 'bottom-right';
-                this.setSavedNotifyPosition(pos);
-                this.applyToastContainerPosition(pos);
             });
-        } catch (_) { /* ignore */ }
-    }
-    getSavedNotifyPosition() {
-        try { return localStorage.getItem('notifyPosition') || 'bottom-right'; } catch (_) { return 'bottom-right'; }
-    }
-    setSavedNotifyPosition(pos) {
-        try { localStorage.setItem('notifyPosition', String(pos || 'bottom-right')); } catch (_) {}
+        });
+        // Affiche la position sélectionnée au chargement
+        const saved = localStorage.getItem('notifyPosition') || 'bottom-right';
+        const btn = notifyGrid.querySelector(`.notify-cell[data-position="${saved}"]`);
+        if (btn) btn.classList.add('active');
     }
 
-    applyToastContainerPosition(pos) {
-        try {
-            const c = document.getElementById('paToastContainer');
-            if (!c) return;
-            const classes = [
-                'pa-pos-top-left', 'pa-pos-top-center', 'pa-pos-top-right',
-                'pa-pos-bottom-left', 'pa-pos-bottom-center', 'pa-pos-bottom-right'
-            ];
-            c.classList.remove(...classes);
-            const map = {
-                'top-left': 'pa-pos-top-left',
-                'top-center': 'pa-pos-top-center',
-                'top-right': 'pa-pos-top-right',
-                'bottom-left': 'pa-pos-bottom-left',
-                'bottom-center': 'pa-pos-bottom-center',
-                'bottom-right': 'pa-pos-bottom-right'
-            };
-            const cls = map[pos] || 'pa-pos-bottom-right';
-            c.classList.add(cls);
-        } catch (_) { /* ignore */ }
-    }
-
-    renderNoGamesEmptyState() {
-        try {
-            const gamesGrid = document.getElementById('gamesGrid');
-            if (!gamesGrid) return;
-            gamesGrid.innerHTML = `
-                <div class="no-results" style="display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;min-height:200px;gap:6px;grid-column:1 / -1;justify-self:center;width:100%;">
-                    <h3 style="margin:0;">Aucun jeu détecté</h3>
-                    <p style="margin:0;color:var(--text-secondary);">Ajoutez des dossiers à scanner dans les réglages ou vérifiez vos chemins par défaut.</p>
-                </div>
-            `;
-        } catch (_) { /* ignore */ }
-    }
-
-    initializeDemoData() {
-        // Vos demoData existantes...
-        this.demoData = {
-            games: [
-                { id: 1, name: 'Assassin\'s Creed Odyssey', achievements: 50, unlocked: 47, steamAppId: 812140 },
-                { id: 2, name: 'The Witcher 3: Wild Hunt', achievements: 78, unlocked: 62, steamAppId: 292030 },
-                { id: 3, name: 'Cyberpunk 2077', achievements: 44, unlocked: 31, steamAppId: 1091500 },
-                { id: 4, name: 'Red Dead Redemption 2', achievements: 52, unlocked: 28, steamAppId: 1174180 },
-                { id: 5, name: 'Grand Theft Auto V', achievements: 69, unlocked: 45, steamAppId: 271590 },
-                { id: 6, name: 'Horizon Zero Dawn', achievements: 56, unlocked: 38, steamAppId: 1151640 }
-            ],
-            achievements: [
-                { id: 1, name: 'Premier Pas', description: 'Terminer le tutoriel', unlocked: true, icon: '🌟', game: 'The Witcher 3: Wild Hunt' },
-                // ... vos autres achievements
-            ]
-        };
+    // Déclenche une notification de test (Toast HTML/CSS custom)
+    triggerTestNotification() {
+        if (typeof window.showNotification === 'function') {
+            // Transmet la position sélectionnée
+            const pos = localStorage.getItem('notifyPosition') || 'bottom-right';
+            window.showNotification('Ceci est une notification de test !', 3500, pos);
+        } else {
+            const feedback = document.getElementById('testNotificationFeedback');
+            if (feedback) {
+                feedback.textContent = 'Erreur: Notifications non supportées.';
+                setTimeout(() => {
+                    feedback.textContent = '';
+                }, 3000);
+            }
+        }
     }
 }
 
-// ✅ INITIALISATION SÉCURISÉE
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        window.app = new PrettyAchievementsUI();
-        console.log('✅ Pretty Achievements UI initialized successfully');
-    } catch (error) {
-        console.error('❌ Erreur initialisation:', error);
-    }
-});
+// Affiche les infos debug de notification dans la console du renderer
+if (window.electronAPI?.on) {
+    window.electronAPI.on('notification/debug', (data) => {
+        console.log('[DEBUG][Notification renderer]', data);
+    });
+}

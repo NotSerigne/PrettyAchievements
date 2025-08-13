@@ -22,6 +22,8 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
+    /* Correction : autoriser le scroll vertical */
+    overflow-y: auto;
 }
 
 :focus {
@@ -195,7 +197,6 @@ body {
 .search-bar:focus-visible {
     outline: none;
     box-shadow: none;
-    border-color: none;
 }
 
 /* ===== MENU CONTENT ===== */
@@ -540,7 +541,6 @@ body {
     max-width: 75%;
     object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.9));
-    image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
 }
 
@@ -939,7 +939,7 @@ body {
 }
 
 .browse-btn:hover {
-    background: var(--primary-hover);
+    background: var(--hover-bg);
     transform: translateY(-1px);
 }
 
@@ -1301,6 +1301,14 @@ body {
     border: 2.5px solid var(--primary-color);
     background: linear-gradient(135deg, #3a4a6a 60%, #679cdf 100%);
     box-shadow: 0 2px 8px rgba(103,156,223,0.18);
+    outline: 2px solid #fff;
+    outline-offset: -2px;
+    transition: background 0.18s, border 0.18s, outline 0.18s;
+}
+.notify-cell:active:not(.disabled) {
+    box-shadow: 0 0 0 2px var(--primary-color);
+    border-color: #fff;
+    background: linear-gradient(135deg, #679cdf 60%, #3a4a6a 100%);
 }
 .notify-cell:hover:not(.active):not(.disabled) {
     border-color: var(--primary-color);
@@ -1315,26 +1323,6 @@ body {
 
 /* in-app toast system removed; moved to renderer/notifications and main overlay */
 
-/* ===== GLOBAL: Hide all scrollbars while keeping scroll functionality ===== */
-/* Chrome, Safari, Opera (WebKit/Blink) */
-*::-webkit-scrollbar {
-    width: 0 !important;
-    height: 0 !important;
-}
-*::-webkit-scrollbar-thumb {
-    background: transparent !important;
-}
-*::-webkit-scrollbar-track {
-    background: transparent !important;
-}
-/* Firefox */
-* {
-    scrollbar-width: none !important;
-}
-/* IE and old Edge */
-* {
-    -ms-overflow-style: none !important;
-}
 
 /* ===== GAME CARD FADE-IN ANIMATION ===== */
 @keyframes pa-fade-in-up {

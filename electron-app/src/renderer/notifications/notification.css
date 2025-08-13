@@ -1,9 +1,0 @@
-/* Old visual style for overlay toast content (mirrors previous in-app look) */
-.pa-toast{display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;height:100%;padding:12px 14px;border-radius:10px;background:#222;border:1px solid #444;box-shadow:0 10px 24px rgba(0,0,0,0.35);color:#fff;font-family:Segoe UI,Tahoma,sans-serif}
-.pa-toast.pa-info{border-color:#4a78c2}
-.pa-toast.pa-success{border-color:#28a745}
-.pa-toast.pa-error{border-color:#dc3545}
-.pa-toast .content{flex:1 1 auto}
-.pa-toast .title{font-weight:700;margin-bottom:2px}
-.pa-toast .msg{opacity:.85;font-size:14px}
-.pa-toast .close{background:transparent;border:0;color:#ccc;cursor:pointer;font-size:14px}
